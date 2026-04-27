@@ -171,7 +171,7 @@ useHead(() => ({
 
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-3">
-          <h1 class="text-2xl font-bold text-white truncate">{{ player!.name }}</h1>
+          <h1 class="text-xl sm:text-2xl font-bold text-white truncate">{{ player!.name }}</h1>
           <NuxtLink
             v-if="user"
             :to="`/admin/players/${id}/edit`"
@@ -191,7 +191,7 @@ useHead(() => ({
       </div>
 
       <!-- ELO sparkline -->
-      <div v-if="sparklinePath" class="shrink-0">
+      <div v-if="sparklinePath" class="shrink-0 hidden sm:block">
         <p class="text-xs text-slate-500 mb-1">ELO history</p>
         <svg
           viewBox="0 0 300 60"

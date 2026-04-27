@@ -170,15 +170,15 @@ useHead(() => ({
       </div>
 
       <!-- Score row -->
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 sm:gap-4">
         <!-- Winner -->
-        <NuxtLink :to="`/players/${data.match.winner_id}`" class="flex items-center gap-3 flex-1 group">
-          <PlayerAvatar :name="data.winner?.name ?? '—'" :avatar-url="data.winner?.avatar_url" :size="48" />
-          <div>
-            <p class="font-semibold text-white group-hover:text-brand-400 transition-colors">
+        <NuxtLink :to="`/players/${data.match.winner_id}`" class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 group">
+          <PlayerAvatar :name="data.winner?.name ?? '—'" :avatar-url="data.winner?.avatar_url" :size="48" class="shrink-0" />
+          <div class="min-w-0">
+            <p class="font-semibold text-white group-hover:text-brand-400 transition-colors truncate">
               {{ data.winner?.name }}
             </p>
-            <div class="flex items-center gap-2 mt-1">
+            <div class="flex items-center gap-1 sm:gap-2 mt-1 flex-wrap">
               <EloChip :elo="data.winner!.elo" />
               <EloDelta :delta="data!.eloChanges.find(e => e.player_id === data!.match.winner_id)?.delta ?? null" />
             </div>
@@ -186,19 +186,19 @@ useHead(() => ({
         </NuxtLink>
 
         <!-- Score -->
-        <div class="text-center shrink-0 px-4">
-          <p class="text-2xl font-mono font-bold text-white">{{ data.match.score }}</p>
-          <p class="text-xs text-slate-500 mt-1">Final score</p>
+        <div class="text-center shrink-0 px-2 sm:px-4">
+          <p class="text-lg sm:text-2xl font-mono font-bold text-white">{{ data.match.score }}</p>
+          <p class="text-xs text-slate-500 mt-1 hidden sm:block">Final score</p>
         </div>
 
         <!-- Loser -->
-        <NuxtLink :to="`/players/${data.match.loser_id}`" class="flex items-center gap-3 flex-1 flex-row-reverse text-right group">
-          <PlayerAvatar :name="data.loser?.name ?? '—'" :avatar-url="data.loser?.avatar_url" :size="48" />
-          <div>
-            <p class="font-semibold text-slate-400 group-hover:text-white transition-colors">
+        <NuxtLink :to="`/players/${data.match.loser_id}`" class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-row-reverse text-right group">
+          <PlayerAvatar :name="data.loser?.name ?? '—'" :avatar-url="data.loser?.avatar_url" :size="48" class="shrink-0" />
+          <div class="min-w-0">
+            <p class="font-semibold text-slate-400 group-hover:text-white transition-colors truncate">
               {{ data.loser?.name }}
             </p>
-            <div class="flex items-center gap-2 mt-1 justify-end">
+            <div class="flex items-center gap-1 sm:gap-2 mt-1 justify-end flex-wrap">
               <EloDelta :delta="data!.eloChanges.find(e => e.player_id === data!.match.loser_id)?.delta ?? null" />
               <EloChip :elo="data.loser!.elo" />
             </div>

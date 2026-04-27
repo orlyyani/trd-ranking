@@ -9,7 +9,7 @@ const winRate = (wins: number, losses: number) => {
 
 <template>
   <div class="space-y-6">
-    <h1 class="text-2xl font-semibold text-white">Leaderboard</h1>
+    <h1 class="text-xl sm:text-2xl font-semibold text-white">Leaderboard</h1>
 
     <div v-if="pending" class="text-slate-400">Loading…</div>
     <div v-else-if="error" class="text-red-400">Failed to load leaderboard.</div>

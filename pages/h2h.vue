@@ -133,31 +133,33 @@ const aWinPct = computed(() => total.value > 0 ? (h2h.value!.aWins / total.value
     <!-- Results -->
     <template v-else-if="h2h">
       <!-- Player headers -->
-      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-        <NuxtLink :to="`/players/${playerAId}`" class="flex items-center gap-3 group">
+      <div class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] items-center gap-4">
+        <!-- Player A -->
+        <NuxtLink :to="`/players/${playerAId}`" class="flex items-center gap-3 group w-full sm:w-auto">
           <PlayerAvatar :name="playerA!.name" :avatar-url="playerA!.avatar_url" :size="48" />
-          <div>
-            <p class="font-semibold text-white group-hover:text-brand-400 transition-colors">{{ playerA!.name }}</p>
+          <div class="min-w-0">
+            <p class="font-semibold text-white group-hover:text-brand-400 transition-colors truncate">{{ playerA!.name }}</p>
             <EloChip :elo="playerA!.elo" />
           </div>
         </NuxtLink>
 
         <!-- Win counts + bar -->
-        <div class="text-center space-y-2 px-4">
+        <div class="text-center space-y-2 sm:px-4 w-full sm:w-auto">
           <p class="text-3xl font-bold font-mono text-white tabular-nums">
             {{ h2h.aWins }}<span class="text-slate-600 mx-1">–</span>{{ h2h.bWins }}
           </p>
-          <div class="flex h-2 w-32 rounded-full overflow-hidden">
+          <div class="flex h-2 w-full sm:w-32 rounded-full overflow-hidden">
             <div class="bg-brand-500 transition-all" :style="`width: ${aWinPct}%`" />
             <div class="bg-red-500 flex-1" />
           </div>
           <p class="text-xs text-slate-500">{{ total }} match{{ total !== 1 ? 'es' : '' }}</p>
         </div>
 
-        <NuxtLink :to="`/players/${playerBId}`" class="flex items-center gap-3 flex-row-reverse text-right group">
+        <!-- Player B -->
+        <NuxtLink :to="`/players/${playerBId}`" class="flex items-center gap-3 sm:flex-row-reverse sm:text-right group w-full sm:w-auto">
           <PlayerAvatar :name="playerB!.name" :avatar-url="playerB!.avatar_url" :size="48" />
-          <div>
-            <p class="font-semibold text-white group-hover:text-brand-400 transition-colors">{{ playerB!.name }}</p>
+          <div class="min-w-0">
+            <p class="font-semibold text-white group-hover:text-brand-400 transition-colors truncate">{{ playerB!.name }}</p>
             <EloChip :elo="playerB!.elo" />
           </div>
         </NuxtLink>
