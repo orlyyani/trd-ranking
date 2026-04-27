@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-surface text-slate-100 antialiased;
+  }
+
+  body {
+    @apply min-h-screen;
+  }
+}
+
+@layer components {
+  /* Reusable card container */
+  .card {
+    @apply bg-surface-elevated border border-surface-border rounded-xl p-4;
+  }
+
+  /* Standard page content container */
+  .container-page {
+    @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+}
