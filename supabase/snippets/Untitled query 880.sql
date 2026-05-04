@@ -1,3 +1,3 @@
-UPDATE public.rank_snapshots
-SET snapshot_date = '2026-04-26'
-WHERE snapshot_date = '2026-04-27';
+insert into public.admins (user_id)
+values ('0a104ba1-a6b5-435b-ba61-2525dfa05a08')
+on conflict do nothing;

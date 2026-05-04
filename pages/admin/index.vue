@@ -11,6 +11,34 @@ const { data: stats } = await useAsyncData('admin-stats', async () => {
   return { playerCount: playerCount ?? 0, matchCount: matchCount ?? 0 }
 })
 
+// Recent matches for quick access (including is_live status)
+const { data: recentMatches } = await useAsyncData('admin-recent-matches', async () => {
+  const { data: matches } = await supabase
+    .from('matches')
+    .select('id, date, score, surface, winner_id, loser_id, is_live')
+    .order('created_at', { ascending: false })
+    .limit(8)
+
+  if (!matches?.length) return []
+
+  const playerIds = [...new Set(matches.flatMap(m => [m.winner_id, m.loser_id]))]
+  const { data: players } = await supabase
+    .from('players')
+    .select('id, name')
+    .in('id', playerIds)
+
+  const pm = new Map((players ?? []).map(p => [p.id, p.name]))
+
+  return matches.map(m => ({
+    id: m.id,
+    date: m.date,
+    score: m.score,
+    is_live: m.is_live,
+    winnerName: pm.get(m.winner_id) ?? '—',
+    loserName:  pm.get(m.loser_id)  ?? '—',
+  }))
+})
+
 async function signOut() {
   await supabase.auth.signOut()
   navigateTo('/login')
@@ -55,7 +83,7 @@ async function signOut() {
         </div>
         <div>
           <p class="font-medium text-white">Add match</p>
-          <p class="text-sm text-slate-400">Record a match result and update ELO</p>
+          <p class="text-sm text-slate-400">Record a match result and update MMR</p>
         </div>
       </NuxtLink>
 
@@ -75,12 +103,53 @@ async function signOut() {
       </NuxtLink>
     </div>
 
+    <!-- Recent matches — quick access for editing / streaming setup -->
+    <div v-if="recentMatches?.length" class="space-y-3">
+      <h2 class="text-sm font-medium text-slate-400 uppercase tracking-widest">Recent matches</h2>
+      <div class="card p-0 divide-y divide-surface-border">
+        <div
+          v-for="m in recentMatches"
+          :key="m.id"
+          class="flex items-center justify-between px-4 py-3 gap-4"
+        >
+          <div class="flex items-center gap-2 min-w-0">
+            <!-- LIVE indicator -->
+            <span v-if="m.is_live" class="relative flex h-2 w-2 shrink-0">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+            </span>
+            <span class="text-sm text-slate-200 truncate">
+              {{ m.winnerName }} <span class="text-slate-500">vs</span> {{ m.loserName }}
+            </span>
+            <span class="text-xs text-slate-500 shrink-0 hidden sm:inline">{{ m.score }}</span>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <NuxtLink
+              :to="`/matches/${m.id}`"
+              class="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              View
+            </NuxtLink>
+            <NuxtLink
+              :to="`/admin/matches/${m.id}/edit`"
+              class="rounded-md border border-surface-border px-2.5 py-1 text-xs text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+            >
+              Edit / Stream
+            </NuxtLink>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Quick links -->
     <div>
       <h2 class="mb-3 text-sm font-medium text-slate-400 uppercase tracking-widest">Quick links</h2>
       <div class="flex flex-wrap gap-3">
         <NuxtLink to="/" class="text-sm text-brand-400 hover:text-brand-300 underline-offset-2 hover:underline">
           Leaderboard
+        </NuxtLink>
+        <NuxtLink to="/matches" class="text-sm text-brand-400 hover:text-brand-300 underline-offset-2 hover:underline">
+          Matches
         </NuxtLink>
         <NuxtLink to="/h2h" class="text-sm text-brand-400 hover:text-brand-300 underline-offset-2 hover:underline">
           Head-to-head

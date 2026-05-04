@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const props = defineProps<{
-  /** ELO points gained (positive) or lost (negative). null = no data. */
+  /** MMR points gained (positive) or lost (negative). null = no data. */
   delta: number | null
 }>()
 

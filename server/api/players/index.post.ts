@@ -1,7 +1,5 @@
 import { serverSupabaseUser, serverSupabaseServiceRole } from '#supabase/server'
-
-// Starting ELO for every new player.
-const INITIAL_ELO = 1000
+import { TIER_STARTING_MMR, isValidTier } from '~/server/utils/mmr'
 
 export default defineEventHandler(async (event) => {
   // ── 1. Auth guard: only admins may create players ──────────────────────────
@@ -11,7 +9,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }
 
-  // Service-role client for admin DB access (bypasses RLS).
   const admin = serverSupabaseServiceRole(event)
 
   const { data: adminRow } = await admin
@@ -26,7 +23,7 @@ export default defineEventHandler(async (event) => {
 
   // ── 2. Parse & validate body ───────────────────────────────────────────────
   const body = await readBody(event)
-  const { name, avatar_url } = body ?? {}
+  const { name, avatar_url, tier } = body ?? {}
 
   if (typeof name !== 'string' || name.trim() === '') {
     throw createError({ statusCode: 400, statusMessage: 'name is required' })
@@ -41,13 +38,18 @@ export default defineEventHandler(async (event) => {
     }
     try {
       const url = new URL(avatar_url)
-      if (url.protocol !== 'https:') {
-        throw new Error('not https')
-      }
+      if (url.protocol !== 'https:') throw new Error('not https')
     } catch {
       throw createError({ statusCode: 400, statusMessage: 'avatar_url must be a valid https URL' })
     }
   }
+
+  const resolvedTier = tier ?? 'unranked'
+  if (!isValidTier(resolvedTier)) {
+    throw createError({ statusCode: 400, statusMessage: 'tier must be unranked, beginner, or class_c' })
+  }
+
+  const startingMmr = TIER_STARTING_MMR[resolvedTier]
 
   // ── 3. Insert the player ───────────────────────────────────────────────────
   const { data: player, error: insertError } = await admin
@@ -55,11 +57,12 @@ export default defineEventHandler(async (event) => {
     .insert({
       name: name.trim(),
       avatar_url: avatar_url ?? null,
-      elo: INITIAL_ELO,
+      mmr: startingMmr,
+      tier: resolvedTier,
       wins: 0,
       losses: 0,
     })
-    .select('id, name, elo')
+    .select('id, name, mmr, tier')
     .single()
 
   if (insertError || !player) {
@@ -69,5 +72,5 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return { id: player.id, name: player.name, elo: player.elo }
+  return { id: player.id, name: player.name, mmr: player.mmr, tier: player.tier }
 })

@@ -4,7 +4,8 @@ export interface LeaderboardEntry {
   id: string
   name: string
   avatar_url: string | null
-  elo: number
+  mmr: number
+  tier: string
   wins: number
   losses: number
   rank: number
@@ -13,16 +14,13 @@ export interface LeaderboardEntry {
 }
 
 /**
- * Fetches all players ordered by ELO (descending) and annotates each with
+ * Fetches all players ordered by MMR (descending) and annotates each with
  * their current rank and rank delta relative to yesterday's snapshot.
  *
  * rank delta = yesterday's rank − today's rank
  *   +3 means the player moved up 3 places
  *   -2 means they fell 2 places
  *   null means no snapshot exists yet (new player or first day)
- *
- * Uses `useAsyncData` so SSR payload is forwarded to the client — no
- * duplicate DB call on hydration.
  */
 export const useLeaderboard = () => {
   const supabase = useSupabase()
@@ -35,8 +33,8 @@ export const useLeaderboard = () => {
     const [playersResult, snapshotsResult] = await Promise.all([
       supabase
         .from('players')
-        .select('id, name, avatar_url, elo, wins, losses')
-        .order('elo', { ascending: false }),
+        .select('id, name, avatar_url, mmr, tier, wins, losses')
+        .order('mmr', { ascending: false }),
       supabase
         .from('rank_snapshots')
         .select('player_id, rank')

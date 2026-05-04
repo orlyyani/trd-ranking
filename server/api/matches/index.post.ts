@@ -1,85 +1,95 @@
 import { serverSupabaseUser, serverSupabaseServiceRole } from '#supabase/server'
-import { calculateElo } from '~/server/utils/elo'
+import { calculateMmr, TIER_STARTING_MMR } from '~/server/utils/mmr'
 import { isUuid, isValidSurface, isValidDate, VALID_SURFACES } from '~/server/utils/validate'
 
+const VALID_STATUSES = ['scheduled', 'live', 'completed'] as const
+type MatchStatus = (typeof VALID_STATUSES)[number]
+
 export default defineEventHandler(async (event) => {
-  // ── 1. Auth guard: only admins may create matches ──────────────────────────
+  // ── 1. Auth guard ──────────────────────────────────────────────────────────
   const user = await serverSupabaseUser(event)
+  if (!user) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
 
-  if (!user) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
-
-  // Service-role client for admin DB access (bypasses RLS).
   const admin = serverSupabaseServiceRole(event)
 
-  // Check admins table.
   const { data: adminRow } = await admin
-    .from('admins')
-    .select('user_id')
-    .eq('user_id', user.id)
-    .maybeSingle()
+    .from('admins').select('user_id').eq('user_id', user.id).maybeSingle()
 
-  if (!adminRow) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  if (!adminRow) throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
 
   // ── 2. Parse & validate body ───────────────────────────────────────────────
   const body = await readBody(event)
+  const {
+    player1_id, player2_id,
+    date, surface, tournament,
+    status = 'scheduled',
+    winner_id,
+    score,
+    stream_url,
+    challonge_match_id,
+    challonge_tournament,
+  } = body ?? {}
 
-  const { winner_id, loser_id, date, score, surface, tournament } = body ?? {}
-
-  if (!isUuid(winner_id)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid winner_id — must be a UUID' })
-  }
-  if (!isUuid(loser_id)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid loser_id — must be a UUID' })
-  }
-  if (winner_id === loser_id) {
-    throw createError({ statusCode: 400, statusMessage: 'winner_id and loser_id must differ' })
-  }
-  if (!isValidDate(date)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid date — expected YYYY-MM-DD' })
-  }
-  if (typeof score !== 'string' || score.trim() === '') {
-    throw createError({ statusCode: 400, statusMessage: 'score is required' })
-  }
+  if (!isUuid(player1_id)) throw createError({ statusCode: 400, statusMessage: 'Invalid player1_id' })
+  if (!isUuid(player2_id)) throw createError({ statusCode: 400, statusMessage: 'Invalid player2_id' })
+  if (player1_id === player2_id) throw createError({ statusCode: 400, statusMessage: 'Players must differ' })
+  if (!isValidDate(date))  throw createError({ statusCode: 400, statusMessage: 'Invalid date — expected YYYY-MM-DD' })
   if (!isValidSurface(surface)) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: `Invalid surface — must be one of: ${VALID_SURFACES.join(', ')}`,
-    })
+    throw createError({ statusCode: 400, statusMessage: `surface must be one of: ${VALID_SURFACES.join(', ')}` })
+  }
+  if (!VALID_STATUSES.includes(status)) {
+    throw createError({ statusCode: 400, statusMessage: 'status must be scheduled, live, or completed' })
   }
   if (tournament !== undefined && tournament !== null && typeof tournament !== 'string') {
     throw createError({ statusCode: 400, statusMessage: 'tournament must be a string or omitted' })
   }
+  if (stream_url && typeof stream_url === 'string') {
+    try { new URL(stream_url) } catch {
+      throw createError({ statusCode: 400, statusMessage: 'stream_url must be a valid URL' })
+    }
+  }
+
+  const completing = status === 'completed'
+
+  if (completing) {
+    if (!isUuid(winner_id)) throw createError({ statusCode: 400, statusMessage: 'winner_id required when completing a match' })
+    if (winner_id !== player1_id && winner_id !== player2_id) {
+      throw createError({ statusCode: 400, statusMessage: 'winner_id must be one of the two players' })
+    }
+    if (typeof score !== 'string' || !score.trim()) {
+      throw createError({ statusCode: 400, statusMessage: 'score is required when completing a match' })
+    }
+  }
+
+  const loser_id = completing
+    ? (winner_id === player1_id ? player2_id : player1_id)
+    : null
 
   // ── 3. Verify both players exist ───────────────────────────────────────────
-  const { data: players, error: playerError } = await admin
-    .from('players')
-    .select('id, elo')
-    .in('id', [winner_id, loser_id])
+  const { data: players } = await admin
+    .from('players').select('id, mmr, wins, losses').in('id', [player1_id, player2_id])
 
-  if (playerError) {
-    throw createError({ statusCode: 500, statusMessage: 'DB error fetching players' })
-  }
   if (!players || players.length !== 2) {
-    throw createError({ statusCode: 400, statusMessage: 'One or both player IDs not found' })
+    throw createError({ statusCode: 400, statusMessage: 'One or both players not found' })
   }
 
-  const winner = players.find(p => p.id === winner_id)!
-  const loser  = players.find(p => p.id === loser_id)!
-
-  // ── 4. Insert the match ────────────────────────────────────────────────────
+  // ── 4. Insert match ────────────────────────────────────────────────────────
   const { data: match, error: matchError } = await admin
     .from('matches')
     .insert({
-      winner_id,
-      loser_id,
+      player1_id,
+      player2_id,
+      winner_id:             completing ? winner_id : null,
+      loser_id:              completing ? loser_id  : null,
       date,
-      score: score.trim(),
+      score:                 completing ? score.trim() : null,
       surface,
-      tournament: tournament?.trim() || null,
+      tournament:            tournament?.trim() || null,
+      status:                status as MatchStatus,
+      stream_url:            stream_url || null,
+      challonge_match_id:    challonge_match_id || null,
+      challonge_tournament:  challonge_tournament || null,
+      is_live:               status === 'live',
     })
     .select('id')
     .single()
@@ -88,30 +98,34 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: matchError?.message ?? 'Failed to insert match' })
   }
 
-  // ── 5. Insert match_players rows ───────────────────────────────────────────
-  const { error: mpError } = await admin.from('match_players').insert([
-    { match_id: match.id, player_id: winner_id, role: 'winner' },
-    { match_id: match.id, player_id: loser_id,  role: 'loser'  },
-  ])
+  // ── 5. Insert match_players + run MMR recalc only when completed ───────────
+  if (completing) {
+    await admin.from('match_players').insert([
+      { match_id: match.id, player_id: winner_id, role: 'winner' },
+      { match_id: match.id, player_id: loser_id,  role: 'loser'  },
+    ])
 
-  if (mpError) {
-    console.error('[matches/post] match_players insert error:', mpError.message)
+    const winner = players.find(p => p.id === winner_id)!
+    const loser  = players.find(p => p.id === loser_id)!
+
+    const preview = calculateMmr(
+      winner.mmr, loser.mmr,
+      winner.wins + winner.losses,
+      loser.wins  + loser.losses,
+    )
+
+    const { error: recalcError } = await admin.rpc('recalculate_all_mmr')
+    if (recalcError) console.error('[matches/post] recalc error:', recalcError.message)
+
+    return {
+      matchId: match.id,
+      status: 'completed',
+      mmr: {
+        winner: { before: winner.mmr, after: preview.newWinnerMmr },
+        loser:  { before: loser.mmr,  after: preview.newLoserMmr  },
+      },
+    }
   }
 
-  // ── 6. Run incremental ELO update (fast path) ─────────────────────────────
-  const { newWinnerElo, newLoserElo } = calculateElo(winner.elo, loser.elo)
-
-  const { error: recalcError } = await admin.rpc('recalculate_all_elo')
-
-  if (recalcError) {
-    console.error('[matches/post] recalculate_all_elo error:', recalcError.message)
-  }
-
-  return {
-    matchId: match.id,
-    elo: {
-      winner: { before: winner.elo, after: newWinnerElo },
-      loser:  { before: loser.elo,  after: newLoserElo  },
-    },
-  }
+  return { matchId: match.id, status }
 })

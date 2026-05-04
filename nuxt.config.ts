@@ -74,6 +74,11 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-only — never exposed to the client bundle
     supabaseServiceKey: '',
+    challongeApiKey: process.env.CHALLONGE_API_KEY ?? '',
+    // Plural (new): "Class C:53yr35ik,Beginners:abc456" — takes priority
+    challongeTournamentUrls: process.env.CHALLONGE_TOURNAMENT_URLS ?? '',
+    // Singular (legacy): kept for backwards compatibility
+    challongeTournamentUrl: process.env.CHALLONGE_TOURNAMENT_URL ?? '',
     public: {
       // These are also set via NUXT_PUBLIC_* env vars automatically
       supabaseUrl: '',

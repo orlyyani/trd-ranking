@@ -3,17 +3,20 @@ definePageMeta({ middleware: 'admin', layout: 'default' })
 
 const config = useRuntimeConfig()
 
-// ── Form state ─────────────────────────────────────────────────────────────────
 const name = ref('')
-const avatarUrl = ref('')       // set after Cloudinary upload
+const tier = ref<'unranked' | 'beginner' | 'class_c'>('unranked')
+const avatarUrl = ref('')
 const loading = ref(false)
 const uploading = ref(false)
 const error = ref('')
 const success = ref<{ id: string; name: string } | null>(null)
 
-// ── Cloudinary browser-direct upload ──────────────────────────────────────────
-// The file never touches our server — it goes straight to Cloudinary and we
-// store the returned secure_url in players.avatar_url.
+const TIERS = [
+  { value: 'unranked', label: 'Unranked (1000 MMR)' },
+  { value: 'beginner', label: 'Beginner (1200 MMR)' },
+  { value: 'class_c',  label: 'Class C (1950 MMR)' },
+] as const
+
 const fileInput = ref<HTMLInputElement | null>(null)
 const previewUrl = ref('')
 
@@ -21,7 +24,6 @@ async function onFileChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
 
-  // Local preview
   previewUrl.value = URL.createObjectURL(file)
 
   const cloudName = config.public.cloudinaryCloudName
@@ -61,7 +63,6 @@ function clearPhoto() {
   if (fileInput.value) fileInput.value.value = ''
 }
 
-// ── Submit ─────────────────────────────────────────────────────────────────────
 async function submit() {
   error.value = ''
   success.value = null
@@ -78,12 +79,14 @@ async function submit() {
       method: 'POST',
       body: {
         name: name.value.trim(),
+        tier: tier.value,
         avatar_url: avatarUrl.value || undefined,
       },
     }) as { id: string; name: string }
 
     success.value = res
     name.value = ''
+    tier.value = 'unranked'
     clearPhoto()
   } catch (err: unknown) {
     const msg = (err as { data?: { statusMessage?: string }; message?: string })
@@ -97,7 +100,6 @@ async function submit() {
 
 <template>
   <div class="space-y-6 max-w-lg">
-    <!-- Back -->
     <NuxtLink to="/admin" class="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
@@ -107,7 +109,6 @@ async function submit() {
 
     <h1 class="text-2xl font-semibold text-white">Add player</h1>
 
-    <!-- Success -->
     <div v-if="success" class="rounded-lg bg-green-900/30 border border-green-700 px-4 py-3 space-y-1">
       <p class="text-sm font-medium text-green-400">Player created!</p>
       <NuxtLink :to="`/players/${success.id}`" class="text-xs text-brand-400 hover:text-brand-300 underline-offset-2 hover:underline">
@@ -128,13 +129,23 @@ async function submit() {
         />
       </div>
 
+      <!-- Tier -->
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1">Starting tier</label>
+        <select
+          v-model="tier"
+          class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+        >
+          <option v-for="t in TIERS" :key="t.value" :value="t.value">{{ t.label }}</option>
+        </select>
+      </div>
+
       <!-- Photo upload -->
       <div>
         <label class="block text-sm font-medium text-slate-300 mb-2">
           Photo <span class="text-slate-500 font-normal">(optional)</span>
         </label>
 
-        <!-- Preview -->
         <div v-if="previewUrl" class="mb-3 flex items-center gap-3">
           <img
             :src="previewUrl"
@@ -176,7 +187,6 @@ async function submit() {
         </p>
       </div>
 
-      <!-- Error -->
       <p v-if="error" class="text-sm text-red-400">{{ error }}</p>
 
       <button

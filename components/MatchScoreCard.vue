@@ -13,6 +13,9 @@ const props = defineProps<{
   loserName: string
   winnerAvatar?: string | null
   loserAvatar?: string | null
+  isLive?: boolean
+  /** Hides the date/meta column — use in narrow containers like sidebars */
+  compact?: boolean
   /** If provided, highlights which side this player is on */
   perspectivePlayerId?: string
 }>()
@@ -38,7 +41,7 @@ const formattedDate = computed(() =>
   >
     <!-- Winner side -->
     <div class="flex items-center gap-2 flex-1 min-w-0">
-      <PlayerAvatar :name="winnerName" :avatar-url="winnerAvatar" :size="32" />
+      <PlayerAvatar :name="winnerName" :avatar-url="winnerAvatar" :size="32" class="shrink-0" />
       <span
         class="truncate text-sm font-medium"
         :class="isWinner ? 'text-brand-400' : 'text-slate-200'"
@@ -48,14 +51,14 @@ const formattedDate = computed(() =>
     </div>
 
     <!-- Score block -->
-    <div class="flex flex-col items-center shrink-0 px-2">
+    <div class="flex flex-col items-center shrink-0 px-1">
       <span class="text-sm font-mono font-semibold text-white">{{ score }}</span>
       <SurfaceBadge :surface="surface" class="mt-0.5" />
     </div>
 
     <!-- Loser side -->
     <div class="flex items-center gap-2 flex-1 min-w-0 flex-row-reverse">
-      <PlayerAvatar :name="loserName" :avatar-url="loserAvatar" :size="32" />
+      <PlayerAvatar :name="loserName" :avatar-url="loserAvatar" :size="32" class="shrink-0" />
       <span
         class="truncate text-sm font-medium text-right"
         :class="isLoser ? 'text-red-400' : 'text-slate-400'"
@@ -64,10 +67,21 @@ const formattedDate = computed(() =>
       </span>
     </div>
 
-    <!-- Meta (date / tournament) -->
-    <div class="hidden sm:flex flex-col items-end shrink-0 text-xs text-slate-500 w-28">
-      <span>{{ formattedDate }}</span>
-      <span v-if="tournament" class="truncate max-w-full">{{ tournament }}</span>
+    <!-- Meta (date / tournament / live) — hidden in compact mode -->
+    <div v-if="!compact" class="hidden sm:flex flex-col items-end shrink-0 text-xs text-slate-500 w-28">
+      <template v-if="isLive">
+        <span class="inline-flex items-center gap-1 text-red-400 font-semibold uppercase tracking-widest">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+          </span>
+          Live
+        </span>
+      </template>
+      <template v-else>
+        <span>{{ formattedDate }}</span>
+        <span v-if="tournament" class="truncate max-w-full">{{ tournament }}</span>
+      </template>
     </div>
   </NuxtLink>
 </template>
