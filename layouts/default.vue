@@ -31,6 +31,11 @@ watch(() => route.path, () => { mobileMenuOpen.value = false })
             </NuxtLink>
           </li>
           <li>
+            <NuxtLink to="/matches" class="nav-link" active-class="nav-link--active">
+              Matches
+            </NuxtLink>
+          </li>
+          <li>
             <NuxtLink to="/h2h" class="nav-link" active-class="nav-link--active">
               Head-to-Head
             </NuxtLink>
@@ -72,6 +77,11 @@ watch(() => route.path, () => { mobileMenuOpen.value = false })
             <li>
               <NuxtLink to="/" class="mobile-nav-link" active-class="mobile-nav-link--active" exact @click="mobileMenuOpen = false">
                 Leaderboard
+              </NuxtLink>
+            </li>
+            <li>
+              <NuxtLink to="/matches" class="mobile-nav-link" active-class="mobile-nav-link--active" @click="mobileMenuOpen = false">
+                Matches
               </NuxtLink>
             </li>
             <li>

@@ -1,4 +1,4 @@
-import type { Surface } from '~/types/database.types'
+import type { Surface, PlayerTier } from '~/types/database.types'
 
 export interface MatchHistoryEntry {
   id: string
@@ -19,7 +19,8 @@ export interface PlayerProfile {
   id: string
   name: string
   avatar_url: string | null
-  elo: number
+  mmr: number
+  tier: PlayerTier
   wins: number
   losses: number
   created_at: string
@@ -34,13 +35,6 @@ export interface PlayerData {
 
 /**
  * Fetches a player's profile, full match history, and surface breakdown.
- *
- * Two-query approach:
- *   1. players row by ID
- *   2. match_players + matches join for the player's match history
- *
- * `useAsyncData` key includes the player ID so each profile page gets its
- * own SSR payload cache entry.
  */
 export const usePlayer = (id: MaybeRef<string>) => {
   const supabase = useSupabase()
@@ -48,10 +42,9 @@ export const usePlayer = (id: MaybeRef<string>) => {
   return useAsyncData<PlayerData>(`player-${unref(id)}`, async () => {
     const playerId = unref(id)
 
-    // 1. Fetch player row.
     const { data: player, error: playerError } = await supabase
       .from('players')
-      .select('id, name, avatar_url, elo, wins, losses, created_at')
+      .select('id, name, avatar_url, mmr, tier, wins, losses, created_at')
       .eq('id', playerId)
       .single()
 
@@ -60,7 +53,6 @@ export const usePlayer = (id: MaybeRef<string>) => {
       return { player: null, matches: [], surfaceStats: {} }
     }
 
-    // 2. Fetch all match_player rows for this player, then fetch those matches.
     const { data: mpRows, error: mpError } = await supabase
       .from('match_players')
       .select('match_id, role')
@@ -84,7 +76,6 @@ export const usePlayer = (id: MaybeRef<string>) => {
       return { player, matches: [], surfaceStats: {} }
     }
 
-    // 3. Build match history and surface breakdown in one pass.
     const surfaceStats: Partial<Record<Surface, SurfaceBreakdown>> = {}
     const matches: MatchHistoryEntry[] = (rawMatches ?? []).map(m => {
       const role = roleMap.get(m.id)!

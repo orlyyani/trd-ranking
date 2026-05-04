@@ -5,7 +5,7 @@ interface H2HPlayer {
   id: string
   name: string
   avatar_url: string | null
-  elo: number
+  mmr: number
 }
 
 interface H2HMatch {
@@ -26,12 +26,11 @@ interface H2HResult {
 
 const supabase = useSupabase()
 
-// All players for the dropdowns.
 const { data: players } = await useAsyncData<H2HPlayer[]>('h2h-players', async () => {
   const { data } = await supabase
     .from('players')
-    .select('id, name, avatar_url, elo')
-    .order('elo', { ascending: false })
+    .select('id, name, avatar_url, mmr')
+    .order('mmr', { ascending: false })
   return (data ?? []) as H2HPlayer[]
 })
 
@@ -42,8 +41,6 @@ const bothSelected = computed(() =>
   !!playerAId.value && !!playerBId.value && playerAId.value !== playerBId.value,
 )
 
-// H2H data — re-fetches whenever the selection changes.
-// server: false because it depends on client-side state.
 const { data: h2h, status } = await useAsyncData<H2HResult | null>(
   'h2h-result',
   async () => {
@@ -122,24 +119,20 @@ const aWinPct = computed(() => total.value > 0 ? (h2h.value!.aWins / total.value
       </div>
     </div>
 
-    <!-- Prompt when not selected -->
     <p v-if="!bothSelected" class="text-slate-500 text-sm text-center">
       Select two different players to see their head-to-head record.
     </p>
 
-    <!-- Loading -->
     <div v-else-if="status === 'pending'" class="text-slate-400 text-sm text-center">Loading…</div>
 
-    <!-- Results -->
     <template v-else-if="h2h">
-      <!-- Player headers -->
       <div class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] items-center gap-4">
         <!-- Player A -->
         <NuxtLink :to="`/players/${playerAId}`" class="flex items-center gap-3 group w-full sm:w-auto">
           <PlayerAvatar :name="playerA!.name" :avatar-url="playerA!.avatar_url" :size="48" />
           <div class="min-w-0">
             <p class="font-semibold text-white group-hover:text-brand-400 transition-colors truncate">{{ playerA!.name }}</p>
-            <EloChip :elo="playerA!.elo" />
+            <MmrChip :mmr="playerA!.mmr" />
           </div>
         </NuxtLink>
 
@@ -160,17 +153,15 @@ const aWinPct = computed(() => total.value > 0 ? (h2h.value!.aWins / total.value
           <PlayerAvatar :name="playerB!.name" :avatar-url="playerB!.avatar_url" :size="48" />
           <div class="min-w-0">
             <p class="font-semibold text-white group-hover:text-brand-400 transition-colors truncate">{{ playerB!.name }}</p>
-            <EloChip :elo="playerB!.elo" />
+            <MmrChip :mmr="playerB!.mmr" />
           </div>
         </NuxtLink>
       </div>
 
-      <!-- No matches yet -->
       <p v-if="!h2h.matches.length" class="text-slate-500 text-sm text-center">
         No matches played between these two players yet.
       </p>
 
-      <!-- Match list -->
       <div v-else class="space-y-3">
         <h2 class="text-xs text-slate-500 uppercase tracking-widest">Meetings</h2>
         <div class="space-y-2">

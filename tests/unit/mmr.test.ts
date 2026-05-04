@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { expectedScore, calculateElo } from '../../server/utils/elo'
+import { expectedScore, calculateMmr } from '../../server/utils/mmr'
 
 describe('expectedScore', () => {
   it('returns 0.5 for equal ratings', () => {
@@ -40,41 +40,39 @@ describe('expectedScore', () => {
   })
 })
 
-describe('calculateElo', () => {
-  it('winner gains ELO, loser loses ELO', () => {
-    const { newWinnerElo, newLoserElo } = calculateElo(1000, 1000)
-    expect(newWinnerElo).toBeGreaterThan(1000)
-    expect(newLoserElo).toBeLessThan(1000)
+describe('calculateMmr', () => {
+  it('winner gains MMR, loser loses MMR', () => {
+    const { newWinnerMmr, newLoserMmr } = calculateMmr(1000, 1000)
+    expect(newWinnerMmr).toBeGreaterThan(1000)
+    expect(newLoserMmr).toBeLessThan(1000)
   })
 
-  it('the sum of ELOs is conserved (zero-sum)', () => {
-    const winnerElo = 1200
-    const loserElo = 1000
-    const { newWinnerElo, newLoserElo } = calculateElo(winnerElo, loserElo)
-    // Rounding may cause ±1 difference; accept within 1 point
-    expect(newWinnerElo + newLoserElo).toBeCloseTo(winnerElo + loserElo, -1)
+  it('the sum of MMR is conserved (zero-sum)', () => {
+    const winnerMmr = 1200
+    const loserMmr = 1000
+    const { newWinnerMmr, newLoserMmr } = calculateMmr(winnerMmr, loserMmr)
+    expect(newWinnerMmr + newLoserMmr).toBeCloseTo(winnerMmr + loserMmr, -1)
   })
 
-  it('underdog upset yields a larger ELO gain than expected win', () => {
-    const { newWinnerElo: upsetGain } = calculateElo(1000, 1400)
-    const { newWinnerElo: expectedGain } = calculateElo(1400, 1000)
-    // Underdog winning gains more ELO
+  it('underdog upset yields a larger MMR gain than expected win', () => {
+    const { newWinnerMmr: upsetGain } = calculateMmr(1000, 1400)
+    const { newWinnerMmr: expectedGain } = calculateMmr(1400, 1000)
     expect(upsetGain - 1000).toBeGreaterThan(expectedGain - 1400)
   })
 
   it('heavy favourite winning gains fewer than K=32 points', () => {
-    const { newWinnerElo } = calculateElo(1600, 1000)
-    expect(newWinnerElo - 1600).toBeLessThan(32)
+    const { newWinnerMmr } = calculateMmr(1600, 1000)
+    expect(newWinnerMmr - 1600).toBeLessThan(32)
   })
 
   it('equal-rated match awards ~16 points to the winner (K/2)', () => {
-    const { newWinnerElo } = calculateElo(1000, 1000)
-    expect(newWinnerElo - 1000).toBe(16)
+    const { newWinnerMmr } = calculateMmr(1000, 1000)
+    expect(newWinnerMmr - 1000).toBe(16)
   })
 
-  it('returns integer ELO values (rounded)', () => {
-    const { newWinnerElo, newLoserElo } = calculateElo(1137, 983)
-    expect(Number.isInteger(newWinnerElo)).toBe(true)
-    expect(Number.isInteger(newLoserElo)).toBe(true)
+  it('returns integer MMR values (rounded)', () => {
+    const { newWinnerMmr, newLoserMmr } = calculateMmr(1137, 983)
+    expect(Number.isInteger(newWinnerMmr)).toBe(true)
+    expect(Number.isInteger(newLoserMmr)).toBe(true)
   })
 })

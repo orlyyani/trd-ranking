@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { Surface } from '~/types/database.types'
+import type { Surface, PlayerTier } from '~/types/database.types'
 
 interface PlayerRow {
   id: string
   name: string
   avatar_url: string | null
-  elo: number
+  mmr: number
+  tier: PlayerTier
   wins: number
   losses: number
   created_at: string
@@ -15,7 +16,7 @@ interface OpponentInfo {
   id: string
   name: string
   avatar_url: string | null
-  elo: number
+  mmr: number
 }
 
 interface MatchEntry {
@@ -31,8 +32,8 @@ interface MatchEntry {
   opponent: OpponentInfo | null
 }
 
-interface EloEntry {
-  elo_after: number
+interface MmrEntry {
+  mmr_after: number
   match_id: string
 }
 
@@ -40,9 +41,21 @@ interface PlayerPageData {
   player: PlayerRow
   matches: MatchEntry[]
   surfaceStats: Partial<Record<Surface, { wins: number; losses: number }>>
-  eloHistory: EloEntry[]
+  mmrHistory: MmrEntry[]
   rank: number
   rankDelta: number | null
+}
+
+const TIER_LABELS: Record<PlayerTier, string> = {
+  class_c:  'Class C',
+  beginner: 'Beginner',
+  unranked: 'Unranked',
+}
+
+const TIER_COLORS: Record<PlayerTier, string> = {
+  class_c:  'bg-red-900/40 text-red-300 ring-red-700',
+  beginner: 'bg-brand-900/40 text-brand-300 ring-brand-700',
+  unranked: 'bg-slate-800 text-slate-400 ring-slate-600',
 }
 
 const route = useRoute()
@@ -64,16 +77,16 @@ const { data, pending, error } = await useAsyncData<PlayerPageData | null>(
     const yesterdayStr = yesterday.toISOString().split('T')[0]
 
     type SR<T> = { data: T | null; error: unknown }
-    const [playerRes, mpRes, eloRes, allPlayersRes, snapshotRes] = await Promise.all([
+    const [playerRes, mpRes, mmrRes, allPlayersRes, snapshotRes] = await Promise.all([
       supabase.from('players').select('*').eq('id', id).single(),
       supabase.from('match_players').select('match_id, role').eq('player_id', id),
-      supabase.from('elo_history').select('elo_after, match_id').eq('player_id', id).order('id', { ascending: true }),
-      supabase.from('players').select('id, name, avatar_url, elo'),
+      supabase.from('elo_history').select('mmr_after, match_id').eq('player_id', id).order('id', { ascending: true }),
+      supabase.from('players').select('id, name, avatar_url, mmr'),
       supabase.from('rank_snapshots').select('rank').eq('player_id', id).eq('snapshot_date', yesterdayStr).maybeSingle(),
     ]) as [
       SR<PlayerRow>,
       SR<{ match_id: string; role: 'winner' | 'loser' }[]>,
-      SR<EloEntry[]>,
+      SR<MmrEntry[]>,
       SR<OpponentInfo[]>,
       SR<{ rank: number }>,
     ]
@@ -82,10 +95,10 @@ const { data, pending, error } = await useAsyncData<PlayerPageData | null>(
 
     const player = playerRes.data
     const mpRows = mpRes.data ?? []
-    const eloRows = eloRes.data ?? []
+    const mmrRows = mmrRes.data ?? []
     const allPlayers = allPlayersRes.data ?? []
 
-    const sortedPlayers = [...allPlayers].sort((a, b) => b.elo - a.elo || a.id.localeCompare(b.id))
+    const sortedPlayers = [...allPlayers].sort((a, b) => b.mmr - a.mmr || a.id.localeCompare(b.id))
     const currentRank = sortedPlayers.findIndex(p => p.id === id) + 1 || 1
     const prevRank = snapshotRes.data?.rank ?? null
     const rankDelta = prevRank !== null ? prevRank - currentRank : null
@@ -117,7 +130,7 @@ const { data, pending, error } = await useAsyncData<PlayerPageData | null>(
       return { ...m, role, opponentId, opponent }
     })
 
-    return { player, matches, surfaceStats, eloHistory: eloRows, rank: currentRank, rankDelta }
+    return { player, matches, surfaceStats, mmrHistory: mmrRows, rank: currentRank, rankDelta }
   },
 )
 
@@ -125,21 +138,22 @@ if (!data.value && !pending.value) {
   throw createError({ statusCode: 404, statusMessage: 'Player not found' })
 }
 
-// ── ELO sparkline ────────────────────────────────────────────────────────────
+// ── MMR sparkline ─────────────────────────────────────────────────────────────
 const sparklinePath = computed(() => {
-  const history = data.value?.eloHistory ?? []
-  const points = [1000, ...history.map(h => h.elo_after)]
+  const history = data.value?.mmrHistory ?? []
+  const startingMmr = data.value?.player?.mmr ?? 1000
+  const points = [startingMmr, ...history.map(h => h.mmr_after)]
   if (points.length < 2) return ''
 
   const W = 300, H = 60, pad = 6
   const min = Math.min(...points)
   const max = Math.max(...points)
-  const range = max - min || 40 // avoid flat line if only one value
+  const range = max - min || 40
 
   return points
-    .map((elo, i) => {
+    .map((mmr, i) => {
       const x = pad + (i / (points.length - 1)) * (W - 2 * pad)
-      const y = (H - pad) - ((elo - min) / range) * (H - 2 * pad)
+      const y = (H - pad) - ((mmr - min) / range) * (H - 2 * pad)
       return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
     })
     .join(' ')
@@ -181,7 +195,13 @@ useHead(() => ({
           </NuxtLink>
         </div>
         <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-400">
-          <EloChip :elo="player!.elo" />
+          <MmrChip :mmr="player!.mmr" />
+          <span
+            class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+            :class="TIER_COLORS[player!.tier]"
+          >
+            {{ TIER_LABELS[player!.tier] }}
+          </span>
           <RankDelta :delta="data.rankDelta" />
           <span class="text-slate-500">#{{ data.rank }}</span>
           <span><span class="text-brand-400 font-semibold">{{ player!.wins }}</span> W</span>
@@ -190,9 +210,9 @@ useHead(() => ({
         </div>
       </div>
 
-      <!-- ELO sparkline -->
+      <!-- MMR sparkline -->
       <div v-if="sparklinePath" class="shrink-0 hidden sm:block">
-        <p class="text-xs text-slate-500 mb-1">ELO history</p>
+        <p class="text-xs text-slate-500 mb-1">MMR history</p>
         <svg
           viewBox="0 0 300 60"
           width="150"
