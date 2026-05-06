@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChallongeTournamentData } from '~/server/api/challonge.get'
+import type { CommunityTournament } from '~/server/api/challonge-community.get'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +32,22 @@ const { data: tournaments, refresh: refreshChallonge } = await useAsyncData<Chal
 const hasBracket = computed(
   () => (tournaments.value?.length ?? 0) > 0,
 )
+
+// Upcoming & in-progress community tournaments (15-min server cache)
+const { data: communityTournaments } = await useFetch<CommunityTournament[]>('/api/challonge-community', {
+  default: () => [],
+})
+
+const activeSlugs = computed(() => new Set(tournaments.value?.map(t => t.slug) ?? []))
+
+function formatTournamentDate(iso: string | null) {
+  if (!iso) return 'Date TBD'
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function formatTournamentType(raw: string) {
+  return raw.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
 
 // Realtime + polling fallback
 onMounted(() => {
@@ -64,6 +81,41 @@ useHead({ title: 'Matches', meta: [{ property: 'og:title', content: 'Matches —
 <template>
   <div class="space-y-6">
     <h1 class="text-xl sm:text-2xl font-semibold text-white">Matches</h1>
+
+    <!-- Upcoming & in-progress community tournaments -->
+    <div v-if="communityTournaments?.length" class="space-y-3">
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Tournaments</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        <a
+          v-for="t in communityTournaments"
+          :key="t.id"
+          :href="t.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="card flex flex-col gap-2 hover:border-slate-500 transition-colors group"
+        >
+          <div class="flex items-start justify-between gap-2">
+            <span class="font-medium text-white group-hover:text-brand-400 transition-colors text-sm leading-snug">{{ t.name }}</span>
+            <span :class="['shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold', t.state === 'underway' ? 'bg-brand-900/50 text-brand-400' : 'bg-yellow-900/40 text-yellow-400']">
+              {{ t.state === 'underway' ? 'Underway' : 'Upcoming' }}
+            </span>
+          </div>
+          <div class="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+            <span>{{ formatTournamentDate(t.startsAt) }}</span>
+            <span>·</span>
+            <span>{{ t.participantsCount }} players</span>
+            <span>·</span>
+            <span>{{ formatTournamentType(t.tournamentType) }}</span>
+          </div>
+          <div v-if="t.state === 'underway' && activeSlugs.has(t.slug)" class="text-xs text-brand-400">
+            View bracket ↓
+          </div>
+          <div v-else class="text-xs text-slate-600 group-hover:text-slate-400 transition-colors">
+            View on Challonge ↗
+          </div>
+        </a>
+      </div>
+    </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start">
 

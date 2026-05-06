@@ -46,6 +46,8 @@ export default defineNuxtConfig({
   modules: [
     '@nuxtjs/supabase',
     '@nuxt/image',
+    '@vercel/analytics/nuxt',
+    '@vercel/speed-insights/nuxt',
   ],
 
   // @nuxt/image — allow Cloudinary URLs and use Cloudinary's own pipeline
@@ -102,6 +104,8 @@ export default defineNuxtConfig({
     challongeTournamentUrls: process.env.CHALLONGE_TOURNAMENT_URLS ?? '',
     // Singular (legacy): kept for backwards compatibility
     challongeTournamentUrl: process.env.CHALLONGE_TOURNAMENT_URL ?? '',
+    // Community subdomain for upcoming tournament list (e.g. "therallydistrict")
+    challongeCommunity: process.env.CHALLONGE_COMMUNITY ?? '',
     public: {
       // These are also set via NUXT_PUBLIC_* env vars automatically
       supabaseUrl: '',

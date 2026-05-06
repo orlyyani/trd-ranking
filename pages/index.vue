@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChallongeTournamentData } from '~/server/api/challonge.get'
+import type { CommunityTournament } from '~/server/api/challonge-community.get'
 
 const PAGE_SIZE = 10
 const page = ref(1)
@@ -23,6 +24,17 @@ const { data: challonge } = await useFetch<ChallongeTournamentData[]>('/api/chal
 const challongeLiveTournaments = computed(() =>
   challonge.value?.filter(t => t.liveMatch) ?? [],
 )
+
+// Upcoming / in-progress community tournaments — sidebar widget (max 3)
+const { data: communityTournaments } = await useFetch<CommunityTournament[]>('/api/challonge-community', {
+  default: () => [],
+})
+const upcomingTournaments = computed(() => communityTournaments.value?.slice(0, 3) ?? [])
+
+function formatUpcomingDate(iso: string | null) {
+  if (!iso) return 'Date TBD'
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 // One entry per live match — DB match first, then one per Challonge tournament
 const liveBanners = computed(() => {
@@ -246,6 +258,32 @@ useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderb
 
         <!-- Weather -->
         <WeatherWidget />
+
+        <!-- Upcoming tournaments -->
+        <div v-if="upcomingTournaments.length" class="space-y-2">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs text-slate-500 uppercase tracking-widest">Upcoming</h2>
+            <NuxtLink to="/matches" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">See all →</NuxtLink>
+          </div>
+          <div class="space-y-2">
+            <a
+              v-for="t in upcomingTournaments"
+              :key="t.id"
+              :href="t.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="card flex items-center justify-between gap-3 hover:border-slate-500 transition-colors group py-3"
+            >
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-white group-hover:text-brand-400 transition-colors truncate">{{ t.name }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">{{ formatUpcomingDate(t.startsAt) }} · {{ t.participantsCount }} players</p>
+              </div>
+              <span :class="['shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold', t.state === 'underway' ? 'bg-brand-900/50 text-brand-400' : 'bg-yellow-900/40 text-yellow-400']">
+                {{ t.state === 'underway' ? 'Live' : 'Soon' }}
+              </span>
+            </a>
+          </div>
+        </div>
 
         <!-- Last match -->
         <div v-if="lastMatch" class="space-y-2">
