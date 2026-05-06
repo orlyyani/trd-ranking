@@ -21,6 +21,6 @@
 
   /* Standard page content container */
   .container-page {
-    @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+    @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full;
   }
 }
