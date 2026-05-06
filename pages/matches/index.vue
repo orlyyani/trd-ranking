@@ -112,6 +112,8 @@ useHead({ title: 'Matches — TRD Ranking' })
               :loser-name="m.player2?.name ?? '—'"
               :winner-avatar="m.player1?.avatar_url ?? null"
               :loser-avatar="m.player2?.avatar_url ?? null"
+              :winner-partner-name="m.match_type === 'doubles' ? (m.player3?.name ?? null) : null"
+              :loser-partner-name="m.match_type === 'doubles' ? (m.player4?.name ?? null) : null"
               :is-live="m.is_live"
             />
           </div>

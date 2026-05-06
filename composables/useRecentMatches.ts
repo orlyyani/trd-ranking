@@ -1,4 +1,4 @@
-import type { Surface, MatchStatus } from '~/types/database.types'
+import type { Surface, MatchStatus, MatchType } from '~/types/database.types'
 
 export interface RecentMatch {
   id: string
@@ -6,8 +6,11 @@ export interface RecentMatch {
   score: string | null
   surface: Surface
   tournament: string | null
+  match_type: MatchType
   player1_id: string | null
   player2_id: string | null
+  player3_id: string | null
+  player4_id: string | null
   winner_id: string | null
   loser_id: string | null
   is_live: boolean
@@ -17,6 +20,8 @@ export interface RecentMatch {
   created_at: string
   player1: { id: string; name: string; avatar_url: string | null; mmr: number } | null
   player2: { id: string; name: string; avatar_url: string | null; mmr: number } | null
+  player3: { id: string; name: string; avatar_url: string | null; mmr: number } | null
+  player4: { id: string; name: string; avatar_url: string | null; mmr: number } | null
 }
 
 interface UseRecentMatchesOptions {
@@ -29,34 +34,38 @@ const PAGE_SIZE = 10
 export const useRecentMatches = (options: UseRecentMatchesOptions = {}) => {
   const supabase = useSupabase()
   const limit = options.limit ?? PAGE_SIZE
-  const page = options.page ?? ref(1)
+  const page  = options.page ?? ref(1)
 
   return useAsyncData<{ matches: RecentMatch[]; total: number }>(
     `recent-matches-${unref(page)}-${limit}`,
     async () => {
-      const p = unref(page)
+      const p    = unref(page)
       const from = (p - 1) * limit
       const to   = from + limit - 1
 
       const [matchRes, countRes] = await Promise.all([
         supabase
           .from('matches')
-          .select('id, date, score, surface, tournament, player1_id, player2_id, winner_id, loser_id, is_live, live_score, stream_url, status, created_at')
+          .select('id, date, score, surface, tournament, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, is_live, live_score, stream_url, status, created_at')
+          .neq('status', 'scheduled')
           .order('created_at', { ascending: false })
           .range(from, to),
         supabase
           .from('matches')
-          .select('id', { count: 'exact', head: true }),
+          .select('id', { count: 'exact', head: true })
+          .neq('status', 'scheduled'),
       ])
 
       const rawMatches = matchRes.data ?? []
-      const total = countRes.count ?? 0
+      const total      = countRes.count ?? 0
 
       if (!rawMatches.length) return { matches: [], total }
 
       const playerIds = [
         ...new Set(
-          rawMatches.flatMap(m => [m.player1_id, m.player2_id].filter(Boolean)),
+          rawMatches.flatMap(m =>
+            [m.player1_id, m.player2_id, m.player3_id, m.player4_id].filter(Boolean),
+          ),
         ),
       ] as string[]
 
@@ -69,8 +78,13 @@ export const useRecentMatches = (options: UseRecentMatchesOptions = {}) => {
 
       const matches: RecentMatch[] = rawMatches.map(m => ({
         ...m,
+        match_type: (m.match_type ?? 'singles') as MatchType,
+        player3_id: m.player3_id ?? null,
+        player4_id: m.player4_id ?? null,
         player1: m.player1_id ? (playerMap.get(m.player1_id) ?? null) : null,
         player2: m.player2_id ? (playerMap.get(m.player2_id) ?? null) : null,
+        player3: m.player3_id ? (playerMap.get(m.player3_id) ?? null) : null,
+        player4: m.player4_id ? (playerMap.get(m.player4_id) ?? null) : null,
       }))
 
       return { matches, total }

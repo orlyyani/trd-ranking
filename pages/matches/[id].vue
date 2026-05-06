@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import type { Surface, MatchStatus } from '~/types/database.types'
+import type { Surface, MatchStatus, MatchType } from '~/types/database.types'
 
 interface MatchRow {
   id: string; date: string
+  match_type: MatchType
   player1_id: string | null; player2_id: string | null
+  player3_id: string | null; player4_id: string | null
   winner_id: string | null; loser_id: string | null
   score: string | null; surface: Surface; tournament: string | null
   stream_url: string | null; is_live: boolean
@@ -16,6 +18,8 @@ interface MatchPageData {
   match: MatchRow
   player1: PlayerSnap | null
   player2: PlayerSnap | null
+  player3: PlayerSnap | null
+  player4: PlayerSnap | null
   h2hMatches: H2HMatch[]
   winnerH2HWins: number
   loserH2HWins: number
@@ -71,22 +75,23 @@ const { data, pending, error } = await useAsyncData<MatchPageData | null>(`match
 
   const { data: match } = await supabase
     .from('matches')
-    .select('id, date, player1_id, player2_id, winner_id, loser_id, score, surface, tournament, stream_url, is_live, live_score, status, created_at')
+    .select('id, date, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, score, surface, tournament, stream_url, is_live, live_score, status, created_at')
     .eq('id', id).single() as SR<MatchRow>
   if (!match) return null
 
-  const participantIds = [match.player1_id, match.player2_id].filter(Boolean) as string[]
+  const allPlayerIds = [match.player1_id, match.player2_id, match.player3_id, match.player4_id].filter(Boolean) as string[]
 
-  const [player1Res, player2Res, mmrRes, h2hRaw] = await Promise.all([
-    match.player1_id ? supabase.from('players').select('id, name, avatar_url, mmr').eq('id', match.player1_id).single() : Promise.resolve({ data: null }),
-    match.player2_id ? supabase.from('players').select('id, name, avatar_url, mmr').eq('id', match.player2_id).single() : Promise.resolve({ data: null }),
+  const [playersRes, mmrRes, h2hRaw] = await Promise.all([
+    supabase.from('players').select('id, name, avatar_url, mmr').in('id', allPlayerIds),
     supabase.from('elo_history').select('player_id, delta').eq('match_id', id),
     (match.player1_id && match.player2_id)
       ? supabase.from('matches').select('id, date, score, surface, winner_id, loser_id').or(
           `and(player1_id.eq.${match.player1_id},player2_id.eq.${match.player2_id}),and(player1_id.eq.${match.player2_id},player2_id.eq.${match.player1_id})`
         ).lte('date', match.date).order('date', { ascending: false })
       : Promise.resolve({ data: [] }),
-  ]) as [SR<PlayerSnap>, SR<PlayerSnap>, SR<MmrChange[]>, SR<H2HMatch[]>]
+  ]) as [SR<PlayerSnap[]>, SR<MmrChange[]>, SR<H2HMatch[]>]
+
+  const pm = new Map((playersRes.data ?? []).map(p => [p.id, p]))
 
   const h2hMatches = (h2hRaw.data ?? []) as H2HMatch[]
   const winnerH2HWins = h2hMatches.filter(m => m.winner_id === match.player1_id).length
@@ -94,8 +99,10 @@ const { data, pending, error } = await useAsyncData<MatchPageData | null>(`match
 
   return {
     match,
-    player1: player1Res.data,
-    player2: player2Res.data,
+    player1: match.player1_id ? (pm.get(match.player1_id) ?? null) : null,
+    player2: match.player2_id ? (pm.get(match.player2_id) ?? null) : null,
+    player3: match.player3_id ? (pm.get(match.player3_id) ?? null) : null,
+    player4: match.player4_id ? (pm.get(match.player4_id) ?? null) : null,
     h2hMatches,
     winnerH2HWins,
     loserH2HWins,
@@ -108,28 +115,46 @@ if (!data.value && !pending.value) throw createError({ statusCode: 404, statusMe
 onMounted(loadVoteData)
 watch(user, loadVoteData)
 
+const isDoubles   = computed(() => data.value?.match?.match_type === 'doubles')
+const isCompleted = computed(() => data.value?.match?.status === 'completed')
+const isLive      = computed(() => data.value?.match?.is_live)
+
 const formattedDate = computed(() => {
   const d = data.value?.match?.date
   if (!d) return ''
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 })
 
-const isCompleted = computed(() => data.value?.match?.status === 'completed')
-const isLive      = computed(() => data.value?.match?.is_live)
+// Which players are on the winning / losing team
+const teamA = computed(() => ({ main: data.value?.player1, partner: data.value?.player3 }))
+const teamB = computed(() => ({ main: data.value?.player2, partner: data.value?.player4 }))
 
-// For MVP voting, use player1 as "winner candidate" and player2 as "loser candidate"
-const voteablePlayers = computed(() => {
-  const m = data.value
-  if (!m || !isCompleted.value) return []
-  return [
-    { id: m.match.winner_id!, name: m.player1?.id === m.match.winner_id ? m.player1?.name : m.player2?.name },
-    { id: m.match.loser_id!,  name: m.player1?.id === m.match.loser_id  ? m.player1?.name : m.player2?.name },
-  ].filter(p => p.id)
+const teamAWon = computed(() => {
+  const m = data.value?.match
+  return m?.winner_id === m?.player1_id
 })
 
-useHead(() => ({
-  title: data.value ? `${data.value.player1?.name} vs ${data.value.player2?.name} — TRD Ranking` : 'Match',
-}))
+// All voteable players for MVP (2 for singles, 4 for doubles)
+const voteablePlayers = computed(() => {
+  const d = data.value
+  if (!d || !isCompleted.value) return []
+  const ids = [d.match.winner_id, d.match.loser_id, ...(isDoubles.value ? [d.match.player3_id, d.match.player4_id] : [])].filter(Boolean) as string[]
+  const pm = new Map([d.player1, d.player2, d.player3, d.player4].filter(Boolean).map(p => [p!.id, p!]))
+  return ids.map(id => ({ id, name: pm.get(id)?.name ?? '—' }))
+})
+
+function mmrDelta(playerId: string | null | undefined) {
+  if (!playerId) return null
+  return data.value?.mmrChanges.find(e => e.player_id === playerId)?.delta ?? null
+}
+
+useHead(() => {
+  const d = data.value
+  if (!d) return { title: 'Match — TRD Ranking' }
+  const teamALabel = [d.player1?.name, d.player3?.name].filter(Boolean).join(' & ')
+  const teamBLabel = [d.player2?.name, d.player4?.name].filter(Boolean).join(' & ')
+  return { title: `${teamALabel} vs ${teamBLabel} — TRD Ranking` }
+})
 </script>
 
 <template>
@@ -145,11 +170,14 @@ useHead(() => ({
           <span>{{ formattedDate }}</span>
           <span>·</span>
           <SurfaceBadge :surface="data.match.surface" />
+          <template v-if="isDoubles">
+            <span>·</span>
+            <span class="font-medium text-slate-400">Doubles</span>
+          </template>
           <template v-if="data.match.tournament">
             <span>·</span>
             <span>{{ data.match.tournament }}</span>
           </template>
-          <!-- Status badge -->
           <span>·</span>
           <span :class="['font-semibold capitalize', isLive ? 'text-red-400' : isCompleted ? 'text-brand-400' : 'text-yellow-400']">
             <template v-if="isLive">
@@ -168,27 +196,36 @@ useHead(() => ({
           v-if="user"
           :to="`/admin/matches/${id}/edit`"
           class="shrink-0 rounded-lg border border-surface-border px-2.5 py-1 text-xs text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
-        >
-          Edit
-        </NuxtLink>
+        >Edit</NuxtLink>
       </div>
 
       <!-- Score row -->
       <div class="flex items-center gap-2 sm:gap-4">
-        <!-- Player 1 -->
-        <NuxtLink :to="data.player1 ? `/players/${data.player1.id}` : '#'" class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 group">
-          <PlayerAvatar :name="data.player1?.name ?? '—'" :avatar-url="data.player1?.avatar_url ?? null" :size="48" class="shrink-0" />
+        <!-- Team A / Player 1 -->
+        <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+          <PlayerAvatar :name="teamA.main?.name ?? '—'" :avatar-url="teamA.main?.avatar_url ?? null" :size="48" class="shrink-0" />
           <div class="min-w-0">
-            <p class="font-semibold text-white group-hover:text-brand-400 transition-colors truncate">{{ data.player1?.name ?? '—' }}</p>
+            <NuxtLink :to="teamA.main ? `/players/${teamA.main.id}` : '#'" class="font-semibold text-white hover:text-brand-400 transition-colors truncate block">
+              {{ teamA.main?.name ?? '—' }}
+            </NuxtLink>
+            <!-- Doubles partner -->
+            <NuxtLink v-if="isDoubles && teamA.partner" :to="`/players/${teamA.partner.id}`" class="text-sm text-slate-400 hover:text-white transition-colors truncate block">
+              &amp; {{ teamA.partner.name }}
+            </NuxtLink>
             <div class="flex items-center gap-1 sm:gap-2 mt-1 flex-wrap">
-              <MmrChip v-if="data.player1" :mmr="data.player1.mmr" />
-              <MmrDelta v-if="isCompleted && data.match.winner_id === data.player1?.id" :delta="data.mmrChanges.find(e => e.player_id === data.player1?.id)?.delta ?? null" />
-              <span v-if="isCompleted && data.match.winner_id === data.player1?.id" class="text-xs text-brand-400 font-semibold">W</span>
+              <MmrChip v-if="teamA.main" :mmr="teamA.main.mmr" />
+              <MmrDelta v-if="isCompleted" :delta="mmrDelta(teamA.main?.id)" />
+              <template v-if="isDoubles && teamA.partner && isCompleted">
+                <span class="text-slate-600 text-xs">·</span>
+                <MmrDelta :delta="mmrDelta(teamA.partner.id)" />
+              </template>
+              <span v-if="isCompleted && teamAWon" class="text-xs text-brand-400 font-semibold">W</span>
+              <span v-else-if="isCompleted && !teamAWon && data.match.winner_id" class="text-xs text-red-400 font-semibold">L</span>
             </div>
           </div>
-        </NuxtLink>
+        </div>
 
-        <!-- Centre: score / live score -->
+        <!-- Centre score -->
         <div class="text-center shrink-0 px-2 sm:px-4">
           <template v-if="isCompleted && data.match.score">
             <p class="text-lg sm:text-2xl font-mono font-bold text-white">{{ data.match.score }}</p>
@@ -204,36 +241,40 @@ useHead(() => ({
           </template>
         </div>
 
-        <!-- Player 2 -->
-        <NuxtLink :to="data.player2 ? `/players/${data.player2.id}` : '#'" class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-row-reverse text-right group">
-          <PlayerAvatar :name="data.player2?.name ?? '—'" :avatar-url="data.player2?.avatar_url ?? null" :size="48" class="shrink-0" />
+        <!-- Team B / Player 2 -->
+        <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-row-reverse text-right">
+          <PlayerAvatar :name="teamB.main?.name ?? '—'" :avatar-url="teamB.main?.avatar_url ?? null" :size="48" class="shrink-0" />
           <div class="min-w-0">
-            <p class="font-semibold text-slate-400 group-hover:text-white transition-colors truncate">{{ data.player2?.name ?? '—' }}</p>
+            <NuxtLink :to="teamB.main ? `/players/${teamB.main.id}` : '#'" class="font-semibold text-slate-400 hover:text-white transition-colors truncate block">
+              {{ teamB.main?.name ?? '—' }}
+            </NuxtLink>
+            <!-- Doubles partner -->
+            <NuxtLink v-if="isDoubles && teamB.partner" :to="`/players/${teamB.partner.id}`" class="text-sm text-slate-500 hover:text-white transition-colors truncate block">
+              &amp; {{ teamB.partner.name }}
+            </NuxtLink>
             <div class="flex items-center gap-1 sm:gap-2 mt-1 justify-end flex-wrap">
-              <MmrDelta v-if="isCompleted && data.match.loser_id === data.player2?.id" :delta="data.mmrChanges.find(e => e.player_id === data.player2?.id)?.delta ?? null" />
-              <MmrChip v-if="data.player2" :mmr="data.player2.mmr" />
-              <span v-if="isCompleted && data.match.loser_id === data.player2?.id" class="text-xs text-red-400 font-semibold">L</span>
+              <template v-if="isDoubles && teamB.partner && isCompleted">
+                <MmrDelta :delta="mmrDelta(teamB.partner.id)" />
+                <span class="text-slate-600 text-xs">·</span>
+              </template>
+              <MmrDelta v-if="isCompleted" :delta="mmrDelta(teamB.main?.id)" />
+              <MmrChip v-if="teamB.main" :mmr="teamB.main.mmr" />
+              <span v-if="isCompleted && !teamAWon && data.match.winner_id" class="text-xs text-brand-400 font-semibold">W</span>
+              <span v-else-if="isCompleted && teamAWon && data.match.winner_id" class="text-xs text-red-400 font-semibold">L</span>
             </div>
           </div>
-        </NuxtLink>
+        </div>
       </div>
 
-      <!-- Watch live button (no iframe — YouTube blocks embedding) -->
-      <div v-if="data.match.stream_url" class="pt-2 border-t border-surface-border">
-        <a
-          :href="data.match.stream_url"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex items-center gap-2 rounded-lg bg-red-600/20 border border-red-800/50 hover:bg-red-600/30 px-4 py-2 text-sm font-medium text-red-400 transition-colors"
-        >
-          <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          Watch live ↗
-        </a>
-      </div>
     </div>
 
-    <!-- H2H (completed matches only) -->
-    <div v-if="isCompleted && data.h2hMatches.length" class="card space-y-4">
+    <!-- Stream embed -->
+    <div v-if="data.match.stream_url">
+      <MediaEmbed :url="data.match.stream_url" />
+    </div>
+
+    <!-- H2H (singles only — doubles pairings change each match) -->
+    <div v-if="!isDoubles && isCompleted && data.h2hMatches.length" class="card space-y-4">
       <h2 class="text-xs text-slate-500 uppercase tracking-widest">Head-to-head as of this match</h2>
       <div class="flex items-center gap-3">
         <span class="text-sm font-semibold text-brand-400 w-6 text-right tabular-nums">{{ data.winnerH2HWins }}</span>
@@ -247,7 +288,6 @@ useHead(() => ({
         <span>{{ data.player1?.name }}</span>
         <span>{{ data.player2?.name }}</span>
       </div>
-
       <div v-if="data.h2hMatches.length > 1" class="space-y-2 pt-2 border-t border-surface-border">
         <p class="text-xs text-slate-500">Previous meetings</p>
         <div v-for="m in data.h2hMatches.filter(m => m.id !== id)" :key="m.id" class="flex items-center justify-between text-xs text-slate-400">
@@ -264,7 +304,7 @@ useHead(() => ({
       </div>
     </div>
 
-    <!-- MVP voting (completed matches only) -->
+    <!-- MVP voting -->
     <div v-if="isCompleted" class="card space-y-4">
       <h2 class="text-xs text-slate-500 uppercase tracking-widest">MVP vote</h2>
       <p v-if="!user" class="text-sm text-slate-400">

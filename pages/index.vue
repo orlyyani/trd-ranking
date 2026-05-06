@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { ChallongeTournamentData } from '~/server/api/challonge.get'
 
-const { data: leaderboard, pending, error } = await useLeaderboard()
+const PAGE_SIZE = 10
+const page = ref(1)
+const { data: leaderboard, pending, error } = await useLeaderboard({ page, limit: PAGE_SIZE })
+const totalPages = computed(() => Math.ceil((leaderboard.value?.total ?? 0) / PAGE_SIZE))
 
 const { liveMatch } = useLiveMatch()
 
@@ -24,6 +27,8 @@ const liveBanners = computed(() => {
   const items: Array<{
     player1: string
     player2: string
+    player3: string | null
+    player4: string | null
     score: string | null
     streamUrl: string | null
     matchId: string | null
@@ -32,12 +37,15 @@ const liveBanners = computed(() => {
   }> = []
 
   if (liveMatch.value?.player1 && liveMatch.value?.player2) {
+    const m = liveMatch.value
     items.push({
-      player1:        liveMatch.value.player1.name,
-      player2:        liveMatch.value.player2.name,
-      score:          liveMatch.value.live_score,
-      streamUrl:      liveMatch.value.stream_url,
-      matchId:        liveMatch.value.id,
+      player1:        m.player1.name,
+      player2:        m.player2.name,
+      player3:        m.player3?.name ?? null,
+      player4:        m.player4?.name ?? null,
+      score:          m.live_score,
+      streamUrl:      m.stream_url,
+      matchId:        m.id,
       tournamentName: null,
       source:         'db',
     })
@@ -47,6 +55,8 @@ const liveBanners = computed(() => {
     items.push({
       player1:        t.liveMatch!.player1,
       player2:        t.liveMatch!.player2,
+      player3:        null,
+      player4:        null,
       score:          t.liveMatch!.score || null,
       streamUrl:      null,
       matchId:        null,
@@ -61,11 +71,23 @@ const liveBanners = computed(() => {
 const { data: recentData } = await useRecentMatches({ limit: 1 })
 const lastMatch = computed(() => recentData.value?.matches[0] ?? null)
 
+const lastMatchDisplay = computed(() => {
+  const m = lastMatch.value
+  if (!m) return null
+  const winnerIsP1 = m.winner_id === m.player1_id
+  const winner        = winnerIsP1 ? m.player1 : m.player2
+  const loser         = winnerIsP1 ? m.player2 : m.player1
+  const winnerPartner = m.match_type === 'doubles' ? (winnerIsP1 ? m.player3 : m.player4) : null
+  const loserPartner  = m.match_type === 'doubles' ? (winnerIsP1 ? m.player4 : m.player3) : null
+  return { winner, loser, winnerPartner, loserPartner }
+})
+
 const searchQuery = ref('')
 const filteredLeaderboard = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return leaderboard.value ?? []
-  return (leaderboard.value ?? []).filter(p => p.name.toLowerCase().includes(q))
+  const entries = leaderboard.value?.entries ?? []
+  if (!q) return entries
+  return entries.filter(p => p.name.toLowerCase().includes(q))
 })
 
 const winRate = (wins: number, losses: number) => {
@@ -104,13 +126,17 @@ const winRate = (wins: number, losses: number) => {
 
         <!-- Players + score -->
         <div class="flex items-center gap-2 flex-1 min-w-0">
-          <span class="font-medium text-white truncate">{{ b.player1 }}</span>
+          <span class="font-medium text-white truncate">
+            {{ b.player1 }}<template v-if="b.player3"> &amp; {{ b.player3 }}</template>
+          </span>
           <span
             v-if="b.score"
             class="shrink-0 px-2 py-0.5 rounded bg-surface-elevated text-xs font-mono font-semibold text-white"
           >{{ b.score }}</span>
           <span v-else class="text-slate-500 text-sm shrink-0">vs</span>
-          <span class="font-medium text-white truncate">{{ b.player2 }}</span>
+          <span class="font-medium text-white truncate">
+            {{ b.player2 }}<template v-if="b.player4"> &amp; {{ b.player4 }}</template>
+          </span>
         </div>
 
         <!-- Actions -->
@@ -200,6 +226,21 @@ const winRate = (wins: number, losses: number) => {
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="flex items-center justify-between pt-1">
+          <button
+            :disabled="page <= 1"
+            class="rounded-lg border border-surface-border px-3 py-1.5 text-sm text-slate-400 hover:text-white hover:border-slate-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            @click="page--"
+          >← Prev</button>
+          <span class="text-sm text-slate-500">{{ page }} / {{ totalPages }}</span>
+          <button
+            :disabled="page >= totalPages"
+            class="rounded-lg border border-surface-border px-3 py-1.5 text-sm text-slate-400 hover:text-white hover:border-slate-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            @click="page++"
+          >Next →</button>
+        </div>
       </div>
 
       <!-- Right: Weather · Last match · Live details -->
@@ -220,10 +261,12 @@ const winRate = (wins: number, losses: number) => {
             :tournament="lastMatch.tournament"
             :winner-id="lastMatch.winner_id ?? ''"
             :loser-id="lastMatch.loser_id ?? ''"
-            :winner-name="lastMatch.player1?.name ?? '—'"
-            :loser-name="lastMatch.player2?.name ?? '—'"
-            :winner-avatar="lastMatch.player1?.avatar_url ?? null"
-            :loser-avatar="lastMatch.player2?.avatar_url ?? null"
+            :winner-name="lastMatchDisplay?.winner?.name ?? '—'"
+            :loser-name="lastMatchDisplay?.loser?.name ?? '—'"
+            :winner-avatar="lastMatchDisplay?.winner?.avatar_url ?? null"
+            :loser-avatar="lastMatchDisplay?.loser?.avatar_url ?? null"
+            :winner-partner-name="lastMatchDisplay?.winnerPartner?.name ?? null"
+            :loser-partner-name="lastMatchDisplay?.loserPartner?.name ?? null"
             :is-live="lastMatch.is_live"
           />
         </div>
@@ -237,6 +280,7 @@ const winRate = (wins: number, losses: number) => {
             <div class="flex items-center gap-3">
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-semibold text-white truncate">{{ liveMatch.player1?.name ?? '—' }}</p>
+                <p v-if="liveMatch.match_type === 'doubles' && liveMatch.player3" class="text-xs text-slate-500 truncate">&amp; {{ liveMatch.player3.name }}</p>
               </div>
               <div class="shrink-0 text-center">
                 <span v-if="liveMatch.live_score" class="text-lg font-mono font-bold text-white">{{ liveMatch.live_score }}</span>
@@ -244,6 +288,7 @@ const winRate = (wins: number, losses: number) => {
               </div>
               <div class="flex-1 min-w-0 text-right">
                 <p class="text-sm font-semibold text-white truncate">{{ liveMatch.player2?.name ?? '—' }}</p>
+                <p v-if="liveMatch.match_type === 'doubles' && liveMatch.player4" class="text-xs text-slate-500 truncate">&amp; {{ liveMatch.player4.name }}</p>
               </div>
             </div>
             <a
