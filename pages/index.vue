@@ -3,7 +3,9 @@ import type { ChallongeTournamentData } from '~/server/api/challonge.get'
 
 const PAGE_SIZE = 10
 const page = ref(1)
-const { data: leaderboard, pending, error } = await useLeaderboard({ page, limit: PAGE_SIZE })
+const searchQuery = ref('')
+watch(searchQuery, () => { page.value = 1 })
+const { data: leaderboard, pending, error } = await useLeaderboard({ page, limit: PAGE_SIZE, search: searchQuery })
 const totalPages = computed(() => Math.ceil((leaderboard.value?.total ?? 0) / PAGE_SIZE))
 
 const { liveMatch } = useLiveMatch()
@@ -82,13 +84,7 @@ const lastMatchDisplay = computed(() => {
   return { winner, loser, winnerPartner, loserPartner }
 })
 
-const searchQuery = ref('')
-const filteredLeaderboard = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  const entries = leaderboard.value?.entries ?? []
-  if (!q) return entries
-  return entries.filter(p => p.name.toLowerCase().includes(q))
-})
+const filteredLeaderboard = computed(() => leaderboard.value?.entries ?? [])
 
 const winRate = (wins: number, losses: number) => {
   const total = wins + losses

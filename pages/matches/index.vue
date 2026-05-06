@@ -108,12 +108,12 @@ useHead({ title: 'Matches — TRD Ranking' })
               :tournament="m.tournament"
               :winner-id="m.winner_id ?? m.player1_id ?? ''"
               :loser-id="m.loser_id ?? m.player2_id ?? ''"
-              :winner-name="m.player1?.name ?? '—'"
-              :loser-name="m.player2?.name ?? '—'"
-              :winner-avatar="m.player1?.avatar_url ?? null"
-              :loser-avatar="m.player2?.avatar_url ?? null"
-              :winner-partner-name="m.match_type === 'doubles' ? (m.player3?.name ?? null) : null"
-              :loser-partner-name="m.match_type === 'doubles' ? (m.player4?.name ?? null) : null"
+              :winner-name="(m.winner_id === m.player1_id ? m.player1?.name : m.player2?.name) ?? '—'"
+              :loser-name="(m.winner_id === m.player1_id ? m.player2?.name : m.player1?.name) ?? '—'"
+              :winner-avatar="(m.winner_id === m.player1_id ? m.player1?.avatar_url : m.player2?.avatar_url) ?? null"
+              :loser-avatar="(m.winner_id === m.player1_id ? m.player2?.avatar_url : m.player1?.avatar_url) ?? null"
+              :winner-partner-name="m.match_type === 'doubles' ? (m.winner_id === m.player1_id ? m.player3?.name : m.player4?.name) ?? null : null"
+              :loser-partner-name="m.match_type === 'doubles' ? (m.winner_id === m.player1_id ? m.player4?.name : m.player3?.name) ?? null : null"
               :is-live="m.is_live"
             />
           </div>

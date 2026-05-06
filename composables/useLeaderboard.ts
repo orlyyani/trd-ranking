@@ -16,19 +16,22 @@ export interface LeaderboardEntry {
 interface UseLeaderboardOptions {
   page?: MaybeRef<number>
   limit?: number
+  search?: MaybeRef<string>
 }
 
 const PAGE_SIZE = 10
 
 export const useLeaderboard = (options: UseLeaderboardOptions = {}) => {
   const supabase = useSupabase()
-  const limit = options.limit ?? PAGE_SIZE
-  const page  = options.page ?? ref(1)
+  const limit  = options.limit ?? PAGE_SIZE
+  const page   = options.page  ?? ref(1)
+  const search = options.search ?? ref('')
 
   return useAsyncData<{ entries: LeaderboardEntry[]; total: number }>(
-    `leaderboard-${unref(page)}-${limit}`,
+    `leaderboard-${unref(page)}-${limit}-${unref(search)}`,
     async () => {
-      const p    = unref(page)
+      const p = unref(page)
+      const q = unref(search).trim()
       const from = (p - 1) * limit
       const to   = from + limit - 1
 
@@ -36,19 +39,17 @@ export const useLeaderboard = (options: UseLeaderboardOptions = {}) => {
       yesterday.setDate(yesterday.getDate() - 1)
       const yesterdayStr = yesterday.toISOString().split('T')[0]
 
+      let pageQuery  = supabase.from('players').select('id, name, avatar_url, mmr, tier, wins, losses').order('mmr', { ascending: false }).range(from, to)
+      let countQuery = supabase.from('players').select('id', { count: 'exact', head: true })
+      if (q) {
+        pageQuery  = pageQuery.ilike('name', `%${q}%`)
+        countQuery = countQuery.ilike('name', `%${q}%`)
+      }
+
       const [playersResult, countResult, snapshotsResult] = await Promise.all([
-        supabase
-          .from('players')
-          .select('id, name, avatar_url, mmr, tier, wins, losses')
-          .order('mmr', { ascending: false })
-          .range(from, to),
-        supabase
-          .from('players')
-          .select('id', { count: 'exact', head: true }),
-        supabase
-          .from('rank_snapshots')
-          .select('player_id, rank')
-          .eq('snapshot_date', yesterdayStr),
+        pageQuery,
+        countQuery,
+        supabase.from('rank_snapshots').select('player_id, rank').eq('snapshot_date', yesterdayStr),
       ])
 
       const players = playersResult.data ?? []
@@ -66,6 +67,6 @@ export const useLeaderboard = (options: UseLeaderboardOptions = {}) => {
 
       return { entries, total }
     },
-    { watch: [() => unref(page)] },
+    { watch: [() => unref(page), () => unref(search)] },
   )
 }
