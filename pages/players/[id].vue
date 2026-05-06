@@ -9,6 +9,8 @@ interface PlayerRow {
   tier: PlayerTier
   wins: number
   losses: number
+  doubles_wins: number
+  doubles_losses: number
   created_at: string
 }
 
@@ -167,6 +169,18 @@ const winRate = computed(() => {
   return total === 0 ? '—' : `${Math.round((p.wins / total) * 100)}%`
 })
 
+const doublesWinRate = computed(() => {
+  const p = player.value
+  if (!p) return '—'
+  const total = p.doubles_wins + p.doubles_losses
+  return total === 0 ? '—' : `${Math.round((p.doubles_wins / total) * 100)}%`
+})
+
+const hasDoubles = computed(() => {
+  const p = player.value
+  return p ? (p.doubles_wins + p.doubles_losses) > 0 : false
+})
+
 const SURFACES: Surface[] = ['clay', 'hard', 'grass', 'indoor']
 
 useHead(() => ({
@@ -204,9 +218,17 @@ useHead(() => ({
           </span>
           <RankDelta :delta="data.rankDelta" />
           <span class="text-slate-500">#{{ data.rank }}</span>
+          <span class="text-slate-600 text-xs uppercase tracking-wider">Singles</span>
           <span><span class="text-brand-400 font-semibold">{{ player!.wins }}</span> W</span>
           <span><span class="text-red-400 font-semibold">{{ player!.losses }}</span> L</span>
-          <span>{{ winRate }} win rate</span>
+          <span>{{ winRate }}</span>
+          <template v-if="hasDoubles">
+            <span class="text-slate-700">·</span>
+            <span class="text-slate-600 text-xs uppercase tracking-wider">Doubles</span>
+            <span><span class="text-brand-400 font-semibold">{{ player!.doubles_wins }}</span> W</span>
+            <span><span class="text-red-400 font-semibold">{{ player!.doubles_losses }}</span> L</span>
+            <span>{{ doublesWinRate }}</span>
+          </template>
         </div>
       </div>
 
