@@ -1,4 +1,9 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+const siteUrl  = process.env.NUXT_PUBLIC_SITE_URL ?? 'https://trd-ranking.vercel.app'
+const siteName = 'TRD Ranking'
+const siteDesc = 'Tennis player rankings, match history, head-to-head records and live scores for The Rally District.'
+const ogImage  = `${siteUrl}/images/logo-white.png`
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
 
@@ -6,6 +11,9 @@ export default defineNuxtConfig({
 
   app: {
     head: {
+      titleTemplate: `%s — ${siteName}`,
+      title: siteName,
+      htmlAttrs: { lang: 'en' },
       link: [
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
         { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png' },
@@ -14,8 +22,23 @@ export default defineNuxtConfig({
         { rel: 'manifest', href: '/site.webmanifest' },
       ],
       meta: [
-        { name: 'theme-color', content: '#0f172a' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'theme-color', content: '#0f172a' },
+        { name: 'description', content: siteDesc },
+        // Open Graph
+        { property: 'og:site_name', content: siteName },
+        { property: 'og:type', content: 'website' },
+        { property: 'og:title', content: siteName },
+        { property: 'og:description', content: siteDesc },
+        { property: 'og:image', content: ogImage },
+        { property: 'og:image:width', content: '1200' },
+        { property: 'og:image:height', content: '630' },
+        { property: 'og:url', content: siteUrl },
+        // Twitter / X
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: siteName },
+        { name: 'twitter:description', content: siteDesc },
+        { name: 'twitter:image', content: ogImage },
       ],
     },
   },
@@ -83,6 +106,7 @@ export default defineNuxtConfig({
       // These are also set via NUXT_PUBLIC_* env vars automatically
       supabaseUrl: '',
       supabaseAnonKey: '',
+      siteUrl,
       // Cloudinary — browser-direct upload (unsigned preset), safe to expose
       cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME ?? '',
       cloudinaryUploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET ?? '',

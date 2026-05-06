@@ -1,5 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'admin', layout: 'default' })
+useHead({ title: 'Admin' })
 
 const supabase = useSupabaseClient()
 

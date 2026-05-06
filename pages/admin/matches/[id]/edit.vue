@@ -1,5 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'admin', layout: 'default' })
+useHead({ title: 'Edit Match' })
 
 const route = useRoute()
 const id    = route.params.id as string
@@ -140,6 +141,10 @@ async function completeMatch() {
     })
     currentStatus.value = 'completed'
     isLive.value = false
+    if (match.value) {
+      match.value.winner_id = effectiveWinnerId
+      match.value.score = finalScore.value.trim()
+    }
     scoreSuccess.value = 'Match completed! MMR recalculated.'
   } catch (err: unknown) {
     scoreError.value = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? 'Error'
