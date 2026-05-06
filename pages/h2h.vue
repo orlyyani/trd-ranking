@@ -72,6 +72,8 @@ const playerB = computed(() => players.value?.find(p => p.id === playerBId.value
 
 const total = computed(() => (h2h.value?.aWins ?? 0) + (h2h.value?.bWins ?? 0))
 const aWinPct = computed(() => total.value > 0 ? (h2h.value!.aWins / total.value) * 100 : 50)
+
+useHead({ title: 'Head-to-Head' })
 </script>
 
 <template>

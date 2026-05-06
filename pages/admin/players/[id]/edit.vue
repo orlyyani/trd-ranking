@@ -1,5 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'admin', layout: 'default' })
+useHead({ title: 'Edit Player' })
 
 const route = useRoute()
 const id = route.params.id as string

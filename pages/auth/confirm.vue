@@ -3,6 +3,7 @@
 // The @nuxtjs/supabase plugin exchanges it for a session automatically.
 // Once the user ref is populated, forward to /admin.
 definePageMeta({ layout: false })
+useHead({ title: 'Confirming…' })
 
 const user = useSupabaseUser()
 

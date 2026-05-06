@@ -90,6 +90,8 @@ const winRate = (wins: number, losses: number) => {
   const total = wins + losses
   return total === 0 ? '—' : `${Math.round((wins / total) * 100)}%`
 }
+
+useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderboard — TRD Ranking' }] })
 </script>
 
 <template>

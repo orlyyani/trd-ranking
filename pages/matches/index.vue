@@ -39,7 +39,7 @@ onMounted(() => {
     channel = supabase.channel('matches-page-realtime')
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => refresh())
-      .subscribe((status, err) => {
+      .subscribe((_status, err) => {
         if (err) console.warn('[matches] Realtime error:', err)
       })
   } catch (err) {
@@ -58,7 +58,7 @@ onMounted(() => {
   })
 })
 
-useHead({ title: 'Matches — TRD Ranking' })
+useHead({ title: 'Matches', meta: [{ property: 'og:title', content: 'Matches — TRD Ranking' }] })
 </script>
 
 <template>
