@@ -28,7 +28,7 @@ export const useLeaderboard = (options: UseLeaderboardOptions = {}) => {
   const search = options.search ?? ref('')
 
   return useAsyncData<{ entries: LeaderboardEntry[]; total: number }>(
-    `leaderboard-${unref(page)}-${limit}-${unref(search)}`,
+    `leaderboard-${unref(page)}-${limit}`,
     async () => {
       const p = unref(page)
       const q = unref(search).trim()
@@ -39,31 +39,34 @@ export const useLeaderboard = (options: UseLeaderboardOptions = {}) => {
       yesterday.setDate(yesterday.getDate() - 1)
       const yesterdayStr = yesterday.toISOString().split('T')[0]
 
-      let pageQuery  = supabase.from('players').select('id, name, avatar_url, mmr, tier, wins, losses').order('mmr', { ascending: false }).range(from, to)
-      let countQuery = supabase.from('players').select('id', { count: 'exact', head: true })
-      if (q) {
-        pageQuery  = pageQuery.ilike('name', `%${q}%`)
-        countQuery = countQuery.ilike('name', `%${q}%`)
-      }
-
-      const [playersResult, countResult, snapshotsResult] = await Promise.all([
-        pageQuery,
-        countQuery,
+      const [allPlayersResult, snapshotsResult] = await Promise.all([
+        supabase.from('players').select('id, name, avatar_url, mmr, tier, wins, losses').order('mmr', { ascending: false }),
         supabase.from('rank_snapshots').select('player_id, rank').eq('snapshot_date', yesterdayStr),
       ])
 
-      const players = playersResult.data ?? []
-      const total   = countResult.count ?? 0
+      const allPlayers = allPlayersResult.data ?? []
       const snapshotMap = new Map(
         (snapshotsResult.data ?? []).map(s => [s.player_id, s.rank]),
       )
 
-      const entries = players.map((player, index) => {
-        const currentRank = from + index + 1
+      // Assign accurate global ranks to every player first
+      const ranked = allPlayers.map((player, index) => {
+        const currentRank = index + 1
         const prevRank    = snapshotMap.get(player.id) ?? null
-        const rankDelta   = prevRank !== null ? prevRank - currentRank : null
-        return { ...player, rank: currentRank, rankDelta }
+        return {
+          ...player,
+          rank: currentRank,
+          rankDelta: prevRank !== null ? prevRank - currentRank : null,
+        }
       })
+
+      // Filter by search (client-side after global rank assignment)
+      const filtered = q
+        ? ranked.filter(p => p.name.toLowerCase().includes(q.toLowerCase()))
+        : ranked
+
+      const total   = filtered.length
+      const entries = filtered.slice(from, to + 1)
 
       return { entries, total }
     },
