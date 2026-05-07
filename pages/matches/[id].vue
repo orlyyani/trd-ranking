@@ -11,7 +11,7 @@ interface MatchRow {
   stream_url: string | null; is_live: boolean
   live_score: string | null; status: MatchStatus; created_at: string
 }
-interface PlayerSnap { id: string; name: string; avatar_url: string | null; mmr: number }
+interface PlayerSnap { id: string; name: string; avatar_url: string | null; mmr: number; tier: string }
 interface H2HMatch { id: string; date: string; score: string | null; surface: Surface; winner_id: string | null; loser_id: string | null }
 interface MmrChange { player_id: string; delta: number }
 interface MatchPageData {
@@ -82,7 +82,7 @@ const { data, pending, error } = await useAsyncData<MatchPageData | null>(`match
   const allPlayerIds = [match.player1_id, match.player2_id, match.player3_id, match.player4_id].filter(Boolean) as string[]
 
   const [playersRes, mmrRes, h2hRaw] = await Promise.all([
-    supabase.from('players').select('id, name, avatar_url, mmr').in('id', allPlayerIds),
+    supabase.from('players').select('id, name, avatar_url, mmr, tier').in('id', allPlayerIds),
     supabase.from('elo_history').select('player_id, delta').eq('match_id', id),
     (match.player1_id && match.player2_id)
       ? supabase.from('matches').select('id, date, score, surface, winner_id, loser_id').or(
@@ -213,7 +213,7 @@ useHead(() => {
               &amp; {{ teamA.partner.name }}
             </NuxtLink>
             <div class="flex items-center gap-1 sm:gap-2 mt-1 flex-wrap">
-              <MmrChip v-if="teamA.main" :mmr="teamA.main.mmr" />
+              <RankBadge v-if="teamA.main" :tier="teamA.main.tier" :mmr="teamA.main.mmr" :size="32" />
               <MmrDelta v-if="isCompleted" :delta="mmrDelta(teamA.main?.id)" />
               <template v-if="isDoubles && teamA.partner && isCompleted">
                 <span class="text-slate-600 text-xs">·</span>
@@ -258,7 +258,7 @@ useHead(() => {
                 <span class="text-slate-600 text-xs">·</span>
               </template>
               <MmrDelta v-if="isCompleted" :delta="mmrDelta(teamB.main?.id)" />
-              <MmrChip v-if="teamB.main" :mmr="teamB.main.mmr" />
+              <RankBadge v-if="teamB.main" :tier="teamB.main.tier" :mmr="teamB.main.mmr" :size="32" />
               <span v-if="isCompleted && !teamAWon && data.match.winner_id" class="text-xs text-brand-400 font-semibold">W</span>
               <span v-else-if="isCompleted && teamAWon && data.match.winner_id" class="text-xs text-red-400 font-semibold">L</span>
             </div>

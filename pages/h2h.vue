@@ -6,6 +6,7 @@ interface H2HPlayer {
   name: string
   avatar_url: string | null
   mmr: number
+  tier: string
 }
 
 interface H2HMatch {
@@ -29,7 +30,7 @@ const supabase = useSupabase()
 const { data: players } = await useAsyncData<H2HPlayer[]>('h2h-players', async () => {
   const { data } = await supabase
     .from('players')
-    .select('id, name, avatar_url, mmr')
+    .select('id, name, avatar_url, mmr, tier')
     .order('mmr', { ascending: false })
   return (data ?? []) as H2HPlayer[]
 })
@@ -134,7 +135,7 @@ useHead({ title: 'Head-to-Head' })
           <PlayerAvatar :name="playerA!.name" :avatar-url="playerA!.avatar_url" :size="48" />
           <div class="min-w-0">
             <p class="font-semibold text-white group-hover:text-brand-400 transition-colors truncate">{{ playerA!.name }}</p>
-            <MmrChip :mmr="playerA!.mmr" />
+            <RankBadge :tier="playerA!.tier" :mmr="playerA!.mmr" :size="36" />
           </div>
         </NuxtLink>
 
@@ -155,7 +156,7 @@ useHead({ title: 'Head-to-Head' })
           <PlayerAvatar :name="playerB!.name" :avatar-url="playerB!.avatar_url" :size="48" />
           <div class="min-w-0">
             <p class="font-semibold text-white group-hover:text-brand-400 transition-colors truncate">{{ playerB!.name }}</p>
-            <MmrChip :mmr="playerB!.mmr" />
+            <RankBadge :tier="playerB!.tier" :mmr="playerB!.mmr" :size="36" />
           </div>
         </NuxtLink>
       </div>

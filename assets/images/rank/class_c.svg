@@ -1,0 +1,30 @@
+
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#111111" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="256" cy="220" r="160" fill="white" stroke="#2563eb" stroke-width="18"/>
+  <circle cx="256" cy="220" r="130" fill="none" stroke="#2563eb" stroke-width="6" opacity="0.5"/>
+
+  <path d="M180 150 L256 105 L332 150 L332 245 L256 290 L180 245 Z"
+        fill="url(#grad)" stroke="#2563eb" stroke-width="6"/>
+
+  <text x="256" y="225" text-anchor="middle"
+        font-family="Arial" font-size="92" font-weight="bold"
+        fill="white">C</text>
+
+  <rect x="70" y="305" rx="14" ry="14" width="372" height="72"
+        fill="#2563eb"/>
+
+  <text x="256" y="352" text-anchor="middle"
+        font-family="Arial" font-size="34" font-weight="bold"
+        fill="white">CLASS C</text>
+
+  <text x="256" y="435" text-anchor="middle"
+        font-family="Arial" font-size="24"
+        fill="#333">1500 – 1899 MMR</text>
+</svg>
