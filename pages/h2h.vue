@@ -135,7 +135,7 @@ useHead({ title: 'Head-to-Head' })
           <PlayerAvatar :name="playerA!.name" :avatar-url="playerA!.avatar_url" :size="48" />
           <div class="min-w-0">
             <p class="font-semibold text-white group-hover:text-brand-400 transition-colors truncate">{{ playerA!.name }}</p>
-            <RankBadge :tier="playerA!.tier" :mmr="playerA!.mmr" :size="36" />
+            <RankBadge :tier="playerA!.tier" :size="36" />
           </div>
         </NuxtLink>
 
@@ -156,7 +156,7 @@ useHead({ title: 'Head-to-Head' })
           <PlayerAvatar :name="playerB!.name" :avatar-url="playerB!.avatar_url" :size="48" />
           <div class="min-w-0">
             <p class="font-semibold text-white group-hover:text-brand-400 transition-colors truncate">{{ playerB!.name }}</p>
-            <RankBadge :tier="playerB!.tier" :mmr="playerB!.mmr" :size="36" />
+            <RankBadge :tier="playerB!.tier" :size="36" />
           </div>
         </NuxtLink>
       </div>

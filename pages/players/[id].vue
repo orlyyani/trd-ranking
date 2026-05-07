@@ -280,7 +280,11 @@ useHead(() => ({
           </NuxtLink>
         </div>
         <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-400">
-          <RankBadge :tier="player!.tier" :mmr="player!.mmr" :size="44" />
+          <RankBadge :tier="player!.tier" :size="44" />
+          <span class="inline-flex items-baseline gap-1">
+            <span class="text-lg font-mono font-semibold text-white">{{ player!.mmr }}</span>
+            <span class="text-xs text-slate-500">MMR</span>
+          </span>
           <RankDelta :delta="data.rankDelta" />
           <span class="text-slate-500">#{{ data.rank }}</span>
           <span class="text-slate-600 text-xs uppercase tracking-wider">Singles</span>

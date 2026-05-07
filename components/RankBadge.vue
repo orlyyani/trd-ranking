@@ -7,7 +7,6 @@ import unrankedImg from '~/assets/images/rank/unranked.svg'
 
 const props = withDefaults(defineProps<{
   tier: string
-  mmr: number
   size?: number
 }>(), { size: 40 })
 
@@ -41,16 +40,13 @@ const label = computed(() => LABELS[props.tier] ?? props.tier)
       class="object-contain drop-shadow-sm select-none"
     />
 
-    <!-- Tooltip -->
+    <!-- Tooltip: classification name only -->
     <div
       class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30
              opacity-0 group-hover:opacity-100 transition-opacity duration-150"
     >
       <div class="bg-surface-elevated border border-surface-border rounded-lg px-3 py-1.5 text-xs whitespace-nowrap shadow-lg text-center">
-        <p class="text-slate-400 leading-tight">{{ label }}</p>
-        <p class="font-mono font-semibold text-white leading-tight">
-          {{ mmr }} <span class="text-slate-500 font-normal">MMR</span>
-        </p>
+        <p class="text-slate-200 font-medium leading-tight">{{ label }}</p>
       </div>
       <!-- Caret -->
       <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-surface-border" />

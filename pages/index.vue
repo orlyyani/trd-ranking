@@ -227,7 +227,7 @@ useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderb
                     </NuxtLink>
                   </td>
                   <td class="px-4 py-3 text-center">
-                    <RankBadge :tier="player.tier" :mmr="player.mmr" :size="36" />
+                    <RankBadge :tier="player.tier" :size="36" />
                   </td>
                   <td class="px-4 py-3 text-center text-brand-400 font-medium">{{ player.wins }}</td>
                   <td class="px-4 py-3 text-center text-red-400 font-medium">{{ player.losses }}</td>

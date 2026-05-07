@@ -213,7 +213,7 @@ useHead(() => {
               &amp; {{ teamA.partner.name }}
             </NuxtLink>
             <div class="flex items-center gap-1 sm:gap-2 mt-1 flex-wrap">
-              <RankBadge v-if="teamA.main" :tier="teamA.main.tier" :mmr="teamA.main.mmr" :size="32" />
+              <RankBadge v-if="teamA.main" :tier="teamA.main.tier" :size="32" />
               <MmrDelta v-if="isCompleted" :delta="mmrDelta(teamA.main?.id)" />
               <template v-if="isDoubles && teamA.partner && isCompleted">
                 <span class="text-slate-600 text-xs">·</span>
@@ -258,7 +258,7 @@ useHead(() => {
                 <span class="text-slate-600 text-xs">·</span>
               </template>
               <MmrDelta v-if="isCompleted" :delta="mmrDelta(teamB.main?.id)" />
-              <RankBadge v-if="teamB.main" :tier="teamB.main.tier" :mmr="teamB.main.mmr" :size="32" />
+              <RankBadge v-if="teamB.main" :tier="teamB.main.tier" :size="32" />
               <span v-if="isCompleted && !teamAWon && data.match.winner_id" class="text-xs text-brand-400 font-semibold">W</span>
               <span v-else-if="isCompleted && teamAWon && data.match.winner_id" class="text-xs text-red-400 font-semibold">L</span>
             </div>
