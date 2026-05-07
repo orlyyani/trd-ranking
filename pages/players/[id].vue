@@ -343,9 +343,10 @@ useHead(() => ({
       <div class="space-y-4">
 
         <!-- Surface breakdown -->
-        <div v-if="Object.keys(data.surfaceStats).length" class="card space-y-3">
+        <div class="card space-y-3">
           <h2 class="text-xs text-slate-500 uppercase tracking-widest">Surface</h2>
-          <div class="space-y-2">
+          <p v-if="!Object.keys(data.surfaceStats).length" class="text-xs text-slate-600">No matches played yet.</p>
+          <div v-else class="space-y-2">
             <div
               v-for="surface in SURFACES"
               v-show="data.surfaceStats[surface]"
@@ -363,8 +364,9 @@ useHead(() => ({
         </div>
 
         <!-- Tournament achievements -->
-        <div v-if="achievements.entered > 0" class="card space-y-0.5">
+        <div class="card space-y-0.5">
           <h2 class="text-xs text-slate-500 uppercase tracking-widest pb-2">Tournaments</h2>
+          <p v-if="achievements.entered === 0" class="text-xs text-slate-600 pb-1">No tournaments played yet.</p>
 
           <!-- Entered -->
           <button
