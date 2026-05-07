@@ -20,6 +20,13 @@ export default defineNuxtConfig({
         { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16x16.png' },
         { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
         { rel: 'manifest', href: '/site.webmanifest' },
+        // Preconnect to Supabase so the first DB query doesn't pay TCP+TLS setup cost
+        ...(process.env.SUPABASE_URL ? [
+          { rel: 'preconnect', href: process.env.SUPABASE_URL },
+          { rel: 'dns-prefetch', href: process.env.SUPABASE_URL },
+        ] : []),
+        // Preconnect to Cloudinary for player avatar loading
+        { rel: 'preconnect', href: 'https://res.cloudinary.com' },
       ],
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
@@ -88,10 +95,16 @@ export default defineNuxtConfig({
   routeRules: {
     // Leaderboard: revalidate every 60 seconds
     '/': { isr: 60 },
+    // Match list: revalidate every 60 seconds (new matches get added)
+    '/matches': { isr: 60 },
+    // Match detail pages: immutable after entry, cache for 1 hour
+    '/matches/**': { cache: { maxAge: 3600 } },
     // Player profiles: revalidate every 5 minutes
     '/players/**': { isr: 300 },
-    // Match detail: immutable after entry, cache for 1 hour
-    '/matches/**': { cache: { maxAge: 3600 } },
+    // Head-to-head: revalidate every 60 seconds
+    '/h2h': { isr: 60 },
+    // FAQ: fully static, prerendered at build time
+    '/faq': { prerender: true },
     // Admin pages: never cache, always dynamic
     '/admin/**': { ssr: false },
   },

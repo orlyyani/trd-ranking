@@ -26,7 +26,10 @@ const challongeLiveTournaments = computed(() =>
 )
 
 // Upcoming / in-progress community tournaments — sidebar widget (max 3)
+// lazy: true so this third-party call doesn't block the SSR response
 const { data: communityTournaments } = await useFetch<CommunityTournament[]>('/api/challonge-community', {
+  lazy: true,
+  server: false,
   default: () => [],
 })
 const upcomingTournaments = computed(() => communityTournaments.value?.slice(0, 3) ?? [])

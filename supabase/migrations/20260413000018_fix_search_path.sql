@@ -1,22 +1,59 @@
 -- ============================================================
--- Migration 017: Add Class B and Class A / Open tiers
+-- Migration 018: Fix mutable search_path on SECURITY DEFINER functions
 -- ============================================================
+-- Without SET search_path, a SECURITY DEFINER function is vulnerable to
+-- search_path hijacking — an attacker could create objects in a schema
+-- that appears before public, shadowing tables/functions the function uses.
 
--- ── 1. Extend the enum ────────────────────────────────────────────────────────
--- Postgres requires ADD VALUE statements to be committed before the new
--- value can be used in a CASE expression, so we add both in separate steps.
-ALTER TYPE public.player_tier ADD VALUE IF NOT EXISTS 'class_b';
-ALTER TYPE public.player_tier ADD VALUE IF NOT EXISTS 'class_a';
+-- ── recalculate_all_elo (migration 006) ──────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.recalculate_all_elo()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  rec          record;
+  winner_elo   integer;
+  loser_elo    integer;
+  expected_w   float;
+  expected_l   float;
+  new_w_elo    integer;
+  new_l_elo    integer;
+  k            CONSTANT integer := 32;
+BEGIN
+  UPDATE public.players SET elo = 1000, wins = 0, losses = 0;
+  TRUNCATE public.elo_history;
 
--- ── 2. Update recalculate_all_mmr() with corrected starting MMRs ─────────────
---
--- New tier → starting MMR mapping (per TENNIS_ELO_SYSTEM.md):
---   class_a  → 2200  (Class A / Open, 2200+)
---   class_b  → 1900  (Class B, 1900–2199)
---   class_c  → 1500  (Class C, 1500–1899)
---   beginner → 1000  (Beginner, 1000–1499)
---   unranked → 1000  (Placement Phase)
+  FOR rec IN
+    SELECT id, winner_id, loser_id
+    FROM   public.matches
+    ORDER  BY date ASC, created_at ASC
+  LOOP
+    SELECT elo INTO winner_elo FROM public.players WHERE id = rec.winner_id;
+    SELECT elo INTO loser_elo  FROM public.players WHERE id = rec.loser_id;
 
+    expected_w := 1.0 / (1.0 + POWER(10.0, (loser_elo  - winner_elo)::float / 400.0));
+    expected_l := 1.0 / (1.0 + POWER(10.0, (winner_elo - loser_elo)::float  / 400.0));
+
+    new_w_elo := ROUND(winner_elo + k * (1.0 - expected_w));
+    new_l_elo := ROUND(loser_elo  + k * (0.0 - expected_l));
+
+    INSERT INTO public.elo_history (match_id, player_id, elo_before, elo_after)
+    VALUES
+      (rec.id, rec.winner_id, winner_elo, new_w_elo),
+      (rec.id, rec.loser_id,  loser_elo,  new_l_elo);
+
+    UPDATE public.players SET elo = new_w_elo, wins   = wins   + 1 WHERE id = rec.winner_id;
+    UPDATE public.players SET elo = new_l_elo, losses = losses + 1 WHERE id = rec.loser_id;
+  END LOOP;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.recalculate_all_elo() FROM public, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.recalculate_all_elo() TO service_role;
+
+-- ── recalculate_all_mmr (migration 012 / 017) ────────────────────────────────
 CREATE OR REPLACE FUNCTION public.recalculate_all_mmr()
 RETURNS void
 LANGUAGE plpgsql
@@ -36,7 +73,6 @@ DECLARE
   new_w_mmr       integer;
   new_l_mmr       integer;
 BEGIN
-  -- 1. Reset all players to their tier-based starting MMR.
   UPDATE public.players
   SET
     mmr = CASE tier
@@ -50,16 +86,13 @@ BEGIN
     losses = 0
   WHERE true;
 
-  -- 2. Clear MMR history for clean replay.
   TRUNCATE public.elo_history;
 
-  -- 3. Replay every match in strict chronological order.
   FOR rec IN
     SELECT id, winner_id, loser_id
     FROM   public.matches
     ORDER  BY date ASC, created_at ASC
   LOOP
-    -- Read current MMR and match count (before this iteration).
     SELECT mmr, wins + losses
       INTO winner_mmr, winner_matches
       FROM public.players
@@ -70,7 +103,6 @@ BEGIN
       FROM public.players
      WHERE id = rec.loser_id;
 
-    -- K=40 for first 10 matches per player, K=20 thereafter.
     k_winner := CASE WHEN winner_matches < 10 THEN 40 ELSE 20 END;
     k_loser  := CASE WHEN loser_matches  < 10 THEN 40 ELSE 20 END;
 
