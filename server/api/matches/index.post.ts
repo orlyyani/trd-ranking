@@ -4,6 +4,7 @@ import { isUuid, isValidSurface, isValidDate, VALID_SURFACES } from '~/server/ut
 
 const VALID_STATUSES    = ['scheduled', 'live', 'completed'] as const
 const VALID_MATCH_TYPES = ['singles', 'doubles'] as const
+const VALID_ROUNDS      = ['group', 'quarterfinal', 'semifinal', 'final'] as const
 type MatchStatus = (typeof VALID_STATUSES)[number]
 type MatchType   = (typeof VALID_MATCH_TYPES)[number]
 
@@ -22,7 +23,7 @@ export default defineEventHandler(async (event) => {
   const {
     match_type = 'singles',
     player1_id, player2_id, player3_id, player4_id,
-    date, surface, tournament,
+    date, surface, tournament, round,
     status = 'scheduled',
     winner_id, score,
     stream_url, challonge_match_id, challonge_tournament,
@@ -39,6 +40,9 @@ export default defineEventHandler(async (event) => {
   }
   if (!VALID_STATUSES.includes(status)) {
     throw createError({ statusCode: 400, statusMessage: 'status must be scheduled, live, or completed' })
+  }
+  if (round !== undefined && round !== null && !VALID_ROUNDS.includes(round)) {
+    throw createError({ statusCode: 400, statusMessage: `round must be one of: ${VALID_ROUNDS.join(', ')}` })
   }
   if (stream_url && typeof stream_url === 'string') {
     try { new URL(stream_url) } catch {
@@ -100,6 +104,7 @@ export default defineEventHandler(async (event) => {
       score:                completing ? score.trim() : null,
       surface,
       tournament:           tournament?.trim() || null,
+      round:                round || null,
       status:               status as MatchStatus,
       stream_url:           stream_url || null,
       challonge_match_id:   challonge_match_id || null,

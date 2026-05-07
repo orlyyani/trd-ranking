@@ -10,6 +10,7 @@ const { data: players } = await useAsyncData('admin-players-list', async () => {
 })
 
 const SURFACES = ['clay', 'hard', 'grass', 'indoor'] as const
+const ROUNDS   = ['group', 'quarterfinal', 'semifinal', 'final'] as const
 
 const form = reactive({
   match_type:   'singles' as 'singles' | 'doubles',
@@ -20,6 +21,7 @@ const form = reactive({
   date:          new Date().toISOString().split('T')[0],
   surface:       'hard' as typeof SURFACES[number],
   tournament:    '',
+  round:         '' as typeof ROUNDS[number] | '',
   stream_url:    '',
   challonge_match_id:   '',
   challonge_tournament: '',
@@ -91,6 +93,7 @@ async function submit() {
       surface:      form.surface,
       status:       form.status,
       tournament:   form.tournament.trim() || undefined,
+      round:        form.round || undefined,
       stream_url:   form.stream_url.trim() || undefined,
       challonge_match_id:   form.challonge_match_id.trim()   || undefined,
       challonge_tournament: form.challonge_tournament.trim() || undefined,
@@ -103,7 +106,7 @@ async function submit() {
 
     form.player1_id = ''; form.player2_id = ''; form.player3_id = ''; form.player4_id = ''
     form.winner_id = ''; form.winning_team = ''; form.score = ''
-    form.tournament = ''; form.stream_url = ''
+    form.tournament = ''; form.round = ''; form.stream_url = ''
     form.challonge_match_id = ''; form.challonge_tournament = ''
     form.status = 'scheduled'
   } catch (err: unknown) {
@@ -226,6 +229,14 @@ async function submit() {
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-1">Tournament <span class="text-slate-500 font-normal">(optional)</span></label>
             <input v-model="form.tournament" type="text" placeholder="e.g. Club Championships" class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div v-if="form.tournament.trim()">
+            <label class="block text-sm font-medium text-slate-300 mb-1">Round <span class="text-slate-500 font-normal">(optional)</span></label>
+            <div class="flex gap-2 flex-wrap">
+              <button v-for="r in ROUNDS" :key="r" type="button"
+                :class="['rounded-full px-3 py-1 text-sm font-medium capitalize transition-colors border', form.round === r ? 'bg-brand-600 border-brand-500 text-white' : 'bg-surface border-surface-border text-slate-400 hover:text-white']"
+                @click="form.round = form.round === r ? '' : r">{{ r }}</button>
+            </div>
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-1">Stream URL <span class="text-slate-500 font-normal">(optional)</span></label>
