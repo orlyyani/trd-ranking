@@ -1,6 +1,7 @@
 import { serverSupabaseUser, serverSupabaseServiceRole } from '#supabase/server'
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const VALID_TIERS = ['unranked', 'beginner', 'class_c', 'class_b', 'class_a'] as const
 
 export default defineEventHandler(async (event) => {
   // ── 1. Auth guard ──────────────────────────────────────────────────────────
@@ -23,7 +24,7 @@ export default defineEventHandler(async (event) => {
 
   // ── 3. Parse & validate body ───────────────────────────────────────────────
   const body = await readBody(event)
-  const { name, avatar_url } = body ?? {}
+  const { name, avatar_url, tier } = body ?? {}
 
   const patch: Record<string, unknown> = {}
 
@@ -54,20 +55,42 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  if (tier !== undefined) {
+    if (!VALID_TIERS.includes(tier)) {
+      throw createError({ statusCode: 400, statusMessage: `tier must be one of: ${VALID_TIERS.join(', ')}` })
+    }
+    patch.tier = tier
+  }
+
   if (Object.keys(patch).length === 0) {
     throw createError({ statusCode: 400, statusMessage: 'No fields to update' })
   }
 
-  // ── 4. Apply update ────────────────────────────────────────────────────────
+  // ── 4. Fetch current tier to detect changes ────────────────────────────────
+  const { data: existing } = await admin
+    .from('players')
+    .select('tier')
+    .eq('id', id)
+    .single()
+
+  const tierChanged = tier !== undefined && existing?.tier !== tier
+
+  // ── 5. Apply update ────────────────────────────────────────────────────────
   const { data: player, error } = await admin
     .from('players')
     .update(patch)
     .eq('id', id)
-    .select('id, name, avatar_url')
+    .select('id, name, avatar_url, tier')
     .single()
 
   if (error) throw createError({ statusCode: 500, statusMessage: error.message })
   if (!player) throw createError({ statusCode: 404, statusMessage: 'Player not found' })
+
+  // ── 6. Recalculate MMR when tier changed ───────────────────────────────────
+  if (tierChanged) {
+    const { error: recalcError } = await admin.rpc('recalculate_all_mmr')
+    if (recalcError) console.error('[players/patch] recalc error:', recalcError.message)
+  }
 
   return player
 })

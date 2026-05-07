@@ -9,7 +9,7 @@ const config = useRuntimeConfig()
 
 // ── Load existing player ───────────────────────────────────────────────────────
 const { data: player } = await useAsyncData(`admin-edit-player-${id}`, async () => {
-  const { data } = await supabase.from('players').select('id, name, avatar_url').eq('id', id).single()
+  const { data } = await supabase.from('players').select('id, name, avatar_url, tier').eq('id', id).single()
   return data
 })
 
@@ -17,8 +17,19 @@ if (!player.value) {
   throw createError({ statusCode: 404, statusMessage: 'Player not found' })
 }
 
+const TIERS = [
+  { value: 'unranked', label: 'Unranked — Placement Phase (1000 MMR)' },
+  { value: 'beginner', label: 'Beginner — 1000–1499 (starts at 1000)' },
+  { value: 'class_c',  label: 'Class C — 1500–1899 (starts at 1500)' },
+  { value: 'class_b',  label: 'Class B — 1900–2199 (starts at 1900)' },
+  { value: 'class_a',  label: 'Class A / Open — 2200+ (starts at 2200)' },
+] as const
+
 // ── Form state ─────────────────────────────────────────────────────────────────
 const name = ref(player.value.name)
+const originalTier = player.value.tier as typeof TIERS[number]['value']
+const tier = ref(originalTier)
+const changeTier = ref(false)
 const avatarUrl = ref(player.value.avatar_url ?? '')
 const previewUrl = ref(player.value.avatar_url ?? '')
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -27,6 +38,10 @@ const loading = ref(false)
 const uploading = ref(false)
 const error = ref('')
 const success = ref(false)
+
+watch(changeTier, (enabled) => {
+  if (!enabled) tier.value = originalTier
+})
 
 // ── Cloudinary upload ──────────────────────────────────────────────────────────
 async function onFileChange(e: Event) {
@@ -87,7 +102,8 @@ async function submit() {
     await $fetch(`/api/players/${id}`, {
       method: 'PATCH',
       body: {
-        name: name.value.trim(),
+        name:       name.value.trim(),
+        tier:       tier.value,
         avatar_url: avatarUrl.value || null,
       },
     })
@@ -130,6 +146,32 @@ async function submit() {
           required
           class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
+      </div>
+
+      <!-- Tier -->
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-slate-300">Tier</label>
+
+        <!-- Checkbox gate -->
+        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+          <input v-model="changeTier" type="checkbox" class="rounded accent-brand-500" />
+          <span class="text-sm text-slate-400">Change tier</span>
+        </label>
+
+        <!-- Dropdown — locked unless checkbox is checked -->
+        <select
+          v-model="tier"
+          :disabled="!changeTier"
+          class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <option v-for="t in TIERS" :key="t.value" :value="t.value">{{ t.label }}</option>
+        </select>
+
+        <!-- Warning — only shown when checkbox is checked -->
+        <div v-if="changeTier" class="rounded-lg border border-yellow-700/50 bg-yellow-900/20 px-3 py-2.5 text-xs text-yellow-300 space-y-0.5">
+          <p class="font-semibold">This will trigger a full MMR recalculation for all players.</p>
+          <p class="text-yellow-400/70">Because ELO is interconnected, changing one player's tier resets everyone's MMR to their starting point and replays every match in order. Final MMRs will still reflect actual match history — just from a new baseline.</p>
+        </div>
       </div>
 
       <!-- Photo -->
