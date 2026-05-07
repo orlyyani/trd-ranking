@@ -5,9 +5,11 @@
  */
 
 export const TIER_STARTING_MMR = {
-  class_c:  1950,
-  beginner: 1200,
   unranked: 1000,
+  beginner: 1000,
+  class_c:  1500,
+  class_b:  1900,
+  class_a:  2200,
 } as const
 
 export type PlayerTier = keyof typeof TIER_STARTING_MMR
