@@ -2,6 +2,7 @@ import { serverSupabaseUser, serverSupabaseServiceRole } from '#supabase/server'
 import { isUuid, isValidSurface, isValidDate, UUID_RE, VALID_SURFACES } from '~/server/utils/validate'
 
 const VALID_STATUSES = ['scheduled', 'live', 'completed'] as const
+const VALID_ROUNDS   = ['group', 'quarterfinal', 'semifinal', 'final'] as const
 
 export default defineEventHandler(async (event) => {
   // ── 1. Auth guard ──────────────────────────────────────────────────────────
@@ -23,7 +24,7 @@ export default defineEventHandler(async (event) => {
   const {
     player1_id, player2_id, player3_id, player4_id,
     winner_id, score,
-    date, surface, tournament,
+    date, surface, tournament, round,
     stream_url,
     status,
     challonge_match_id, challonge_tournament,
@@ -37,6 +38,7 @@ export default defineEventHandler(async (event) => {
   if (surface  !== undefined && !isValidSurface(surface)) throw createError({ statusCode: 400, statusMessage: `surface must be one of: ${VALID_SURFACES.join(', ')}` })
   if (status   !== undefined && !VALID_STATUSES.includes(status)) throw createError({ statusCode: 400, statusMessage: 'Invalid status' })
   if (winner_id !== undefined && winner_id !== null && !isUuid(winner_id)) throw createError({ statusCode: 400, statusMessage: 'Invalid winner_id' })
+  if (round !== undefined && round !== null && !VALID_ROUNDS.includes(round)) throw createError({ statusCode: 400, statusMessage: `round must be one of: ${VALID_ROUNDS.join(', ')}` })
 
   // ── 4. Fetch existing match (includes doubles columns) ────────────────────
   const { data: existing } = await admin
@@ -81,6 +83,7 @@ export default defineEventHandler(async (event) => {
   if (date                 !== undefined) patch.date                 = date
   if (surface              !== undefined) patch.surface              = surface
   if (tournament           !== undefined) patch.tournament           = tournament?.trim() || null
+  if (round                !== undefined) patch.round                = round || null
   if (stream_url           !== undefined) patch.stream_url           = stream_url?.trim() || null
   if (challonge_match_id   !== undefined) patch.challonge_match_id   = challonge_match_id || null
   if (challonge_tournament !== undefined) patch.challonge_tournament = challonge_tournament || null

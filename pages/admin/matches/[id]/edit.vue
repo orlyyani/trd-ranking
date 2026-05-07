@@ -14,7 +14,7 @@ const [{ data: players }, { data: match }] = await Promise.all([
   useAsyncData(`admin-edit-match-${id}`, async () => {
     const { data } = await supabase
       .from('matches')
-      .select('id, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, date, score, surface, tournament, stream_url, is_live, live_score, status, challonge_match_id, challonge_tournament')
+      .select('id, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, date, score, surface, tournament, round, stream_url, is_live, live_score, status, challonge_match_id, challonge_tournament')
       .eq('id', id)
       .single()
     return data
@@ -24,6 +24,7 @@ const [{ data: players }, { data: match }] = await Promise.all([
 if (!match.value) throw createError({ statusCode: 404, statusMessage: 'Match not found' })
 
 const SURFACES = ['clay', 'hard', 'grass', 'indoor'] as const
+const ROUNDS   = ['group', 'quarterfinal', 'semifinal', 'final'] as const
 
 const isDoubles = computed(() => match.value?.match_type === 'doubles')
 
@@ -36,6 +37,7 @@ const info = reactive({
   date:                 match.value.date,
   surface:              match.value.surface as typeof SURFACES[number],
   tournament:           match.value.tournament ?? '',
+  round:                match.value.round ?? '' as typeof ROUNDS[number] | '',
   stream_url:           match.value.stream_url ?? '',
   challonge_match_id:   match.value.challonge_match_id ?? '',
   challonge_tournament: match.value.challonge_tournament ?? '',
@@ -60,6 +62,7 @@ async function saveInfo() {
       date:                 info.date,
       surface:              info.surface,
       tournament:           info.tournament.trim()           || undefined,
+      round:                info.round                      || undefined,
       stream_url:           info.stream_url.trim()          || undefined,
       challonge_match_id:   info.challonge_match_id.trim()  || undefined,
       challonge_tournament: info.challonge_tournament.trim() || undefined,
@@ -288,6 +291,14 @@ const completedWinnerName = computed(() => {
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">Tournament <span class="text-slate-500 font-normal">(optional)</span></label>
           <input v-model="info.tournament" type="text" class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+        <div v-if="info.tournament.trim()">
+          <label class="block text-sm font-medium text-slate-300 mb-1">Round <span class="text-slate-500 font-normal">(optional)</span></label>
+          <div class="flex gap-2 flex-wrap">
+            <button v-for="r in ROUNDS" :key="r" type="button"
+              :class="['rounded-full px-3 py-1 text-sm font-medium capitalize transition-colors border', info.round === r ? 'bg-brand-600 border-brand-500 text-white' : 'bg-surface border-surface-border text-slate-400 hover:text-white']"
+              @click="info.round = info.round === r ? '' : r">{{ r }}</button>
+          </div>
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">Stream URL <span class="text-slate-500 font-normal">(optional)</span></label>

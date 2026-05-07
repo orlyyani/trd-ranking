@@ -27,6 +27,7 @@ interface MatchEntry {
   score: string
   surface: Surface
   tournament: string | null
+  round: string | null
   winner_id: string
   loser_id: string
   role: 'winner' | 'loser'
@@ -109,11 +110,11 @@ const { data, pending, error } = await useAsyncData<PlayerPageData | null>(
     const roleMap = new Map<string, 'winner' | 'loser'>(mpRows.map(r => [r.match_id, r.role]))
     const matchIds = mpRows.map(r => r.match_id)
 
-    type RawMatch = { id: string; date: string; score: string; surface: Surface; tournament: string | null; winner_id: string; loser_id: string }
+    type RawMatch = { id: string; date: string; score: string; surface: Surface; tournament: string | null; round: string | null; winner_id: string; loser_id: string }
     const rawMatches: RawMatch[] = matchIds.length
       ? ((await supabase
           .from('matches')
-          .select('id, date, score, surface, tournament, winner_id, loser_id')
+          .select('id, date, score, surface, tournament, round, winner_id, loser_id')
           .in('id', matchIds)
           .order('date', { ascending: false })).data ?? []) as RawMatch[]
       : []
@@ -181,6 +182,86 @@ const hasDoubles = computed(() => {
   return p ? (p.doubles_wins + p.doubles_losses) > 0 : false
 })
 
+// ── Tournament achievements ───────────────────────────────────────────────────
+
+type AchievementFilter = 'entered' | 'champion' | 'finals' | 'semis' | null
+const selectedFilter = ref<AchievementFilter>(null)
+
+const achievementData = computed(() => {
+  const matches = data.value?.matches ?? []
+  const tourMatches = matches.filter(m => m.tournament)
+
+  const byTournament = new Map<string, MatchEntry[]>()
+  for (const m of tourMatches) {
+    const t = m.tournament!
+    if (!byTournament.has(t)) byTournament.set(t, [])
+    byTournament.get(t)!.push(m)
+  }
+
+  const entered = [...byTournament.keys()]
+  const champions = entered.filter(t =>
+    byTournament.get(t)!.some(m => m.round === 'final' && m.role === 'winner'),
+  )
+  const finalists = entered.filter(t =>
+    byTournament.get(t)!.some(m => m.round === 'final'),
+  )
+  const semifinalists = entered.filter(t =>
+    byTournament.get(t)!.some(m => m.round === 'semifinal'),
+  )
+
+  return { byTournament, entered, champions, finalists, semifinalists }
+})
+
+const achievements = computed(() => ({
+  entered:       achievementData.value.entered.length,
+  championships: achievementData.value.champions.length,
+  finals:        achievementData.value.finalists.length,
+  semis:         achievementData.value.semifinalists.length,
+}))
+
+const rightTitle = computed(() => {
+  if (!selectedFilter.value) return 'Match history'
+  if (selectedFilter.value === 'entered')  return 'Tournaments entered'
+  if (selectedFilter.value === 'champion') return 'Championships'
+  if (selectedFilter.value === 'finals')   return 'Finals reached'
+  return 'Semis reached'
+})
+
+const visibleTournaments = computed(() => {
+  const d = achievementData.value
+  if (!selectedFilter.value)               return []
+  if (selectedFilter.value === 'entered')  return d.entered
+  if (selectedFilter.value === 'champion') return d.champions
+  if (selectedFilter.value === 'finals')   return d.finalists
+  return d.semifinalists
+})
+
+function tournamentResult(tournament: string) {
+  const ms = achievementData.value.byTournament.get(tournament) ?? []
+  if (ms.some(m => m.round === 'final'        && m.role === 'winner'))
+    return { label: 'Champion',        cls: 'text-yellow-400 bg-yellow-400/10 ring-yellow-500/30' }
+  if (ms.some(m => m.round === 'final'))
+    return { label: 'Finalist',        cls: 'text-brand-400 bg-brand-400/10 ring-brand-500/30' }
+  if (ms.some(m => m.round === 'semifinal'))
+    return { label: 'Semi-finalist',   cls: 'text-slate-300 bg-slate-700/50 ring-slate-500/30' }
+  if (ms.some(m => m.round === 'quarterfinal'))
+    return { label: 'Quarter-finalist', cls: 'text-slate-400 bg-slate-800 ring-slate-600' }
+  return   { label: 'Participant',     cls: 'text-slate-500 bg-slate-800 ring-slate-700' }
+}
+
+function tournamentDateRange(tournament: string) {
+  const ms = achievementData.value.byTournament.get(tournament) ?? []
+  const dates = ms.map(m => m.date).sort()
+  if (!dates.length) return ''
+  return dates[0] === dates[dates.length - 1]
+    ? dates[0]
+    : `${dates[0]} – ${dates[dates.length - 1]}`
+}
+
+function toggleFilter(f: NonNullable<AchievementFilter>) {
+  selectedFilter.value = selectedFilter.value === f ? null : f
+}
+
 const SURFACES: Surface[] = ['clay', 'hard', 'grass', 'indoor']
 
 useHead(() => ({
@@ -192,8 +273,9 @@ useHead(() => ({
   <div v-if="pending" class="text-slate-400">Loading…</div>
   <div v-else-if="error || !data" class="text-red-400">Player not found.</div>
 
-  <div v-else class="space-y-8">
-    <!-- Player header -->
+  <div v-else class="space-y-6">
+
+    <!-- ── Player header (full width) ─────────────────────────────────────── -->
     <div class="card flex flex-col sm:flex-row items-start sm:items-center gap-6">
       <PlayerAvatar :name="player!.name" :avatar-url="player!.avatar_url" :size="72" />
 
@@ -254,49 +336,166 @@ useHead(() => ({
       </div>
     </div>
 
-    <!-- Surface breakdown -->
-    <div v-if="Object.keys(data.surfaceStats).length" class="card space-y-3">
-      <h2 class="text-xs text-slate-500 uppercase tracking-widest">Surface breakdown</h2>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div
-          v-for="surface in SURFACES"
-          v-show="data.surfaceStats[surface]"
-          :key="surface"
-          class="bg-surface rounded-lg p-3 space-y-1"
-        >
-          <SurfaceBadge :surface="surface" />
-          <div class="text-xs text-slate-400 mt-2">
-            <span class="text-brand-400 font-semibold">{{ data.surfaceStats[surface]?.wins ?? 0 }}W</span>
-            &nbsp;
-            <span class="text-red-400 font-semibold">{{ data.surfaceStats[surface]?.losses ?? 0 }}L</span>
+    <!-- ── Two-column body ────────────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 items-start">
+
+      <!-- Left: Surface breakdown + Achievements -->
+      <div class="space-y-4">
+
+        <!-- Surface breakdown -->
+        <div v-if="Object.keys(data.surfaceStats).length" class="card space-y-3">
+          <h2 class="text-xs text-slate-500 uppercase tracking-widest">Surface</h2>
+          <div class="space-y-2">
+            <div
+              v-for="surface in SURFACES"
+              v-show="data.surfaceStats[surface]"
+              :key="surface"
+              class="flex items-center gap-3"
+            >
+              <SurfaceBadge :surface="surface" class="shrink-0" />
+              <div class="flex-1 text-xs text-slate-400 text-right">
+                <span class="text-brand-400 font-semibold">{{ data.surfaceStats[surface]?.wins ?? 0 }}W</span>
+                &nbsp;
+                <span class="text-red-400 font-semibold">{{ data.surfaceStats[surface]?.losses ?? 0 }}L</span>
+              </div>
+            </div>
           </div>
         </div>
+
+        <!-- Tournament achievements -->
+        <div v-if="achievements.entered > 0" class="card space-y-0.5">
+          <h2 class="text-xs text-slate-500 uppercase tracking-widest pb-2">Tournaments</h2>
+
+          <!-- Entered -->
+          <button
+            class="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-left transition-colors"
+            :class="selectedFilter === 'entered' ? 'bg-surface-elevated ring-1 ring-brand-500/40' : 'hover:bg-surface-elevated'"
+            @click="toggleFilter('entered')"
+          >
+            <span class="text-xl font-bold w-7 text-right shrink-0 text-white">{{ achievements.entered }}</span>
+            <span class="flex-1 text-sm text-slate-300">Entered</span>
+            <svg class="w-3.5 h-3.5 text-slate-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <!-- Champion -->
+          <button
+            :disabled="achievements.championships === 0"
+            class="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-left transition-colors disabled:cursor-default"
+            :class="selectedFilter === 'champion' ? 'bg-surface-elevated ring-1 ring-yellow-500/40' : achievements.championships > 0 ? 'hover:bg-surface-elevated' : ''"
+            @click="achievements.championships > 0 && toggleFilter('champion')"
+          >
+            <span class="text-xl font-bold w-7 text-right shrink-0" :class="achievements.championships > 0 ? 'text-yellow-400' : 'text-slate-700'">{{ achievements.championships }}</span>
+            <span class="flex-1 text-sm" :class="achievements.championships > 0 ? 'text-slate-300' : 'text-slate-600'">Champion</span>
+            <svg v-if="achievements.championships > 0" class="w-3.5 h-3.5 text-slate-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <!-- Finals -->
+          <button
+            :disabled="achievements.finals === 0"
+            class="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-left transition-colors disabled:cursor-default"
+            :class="selectedFilter === 'finals' ? 'bg-surface-elevated ring-1 ring-brand-500/40' : achievements.finals > 0 ? 'hover:bg-surface-elevated' : ''"
+            @click="achievements.finals > 0 && toggleFilter('finals')"
+          >
+            <span class="text-xl font-bold w-7 text-right shrink-0" :class="achievements.finals > 0 ? 'text-brand-400' : 'text-slate-700'">{{ achievements.finals }}</span>
+            <span class="flex-1 text-sm" :class="achievements.finals > 0 ? 'text-slate-300' : 'text-slate-600'">Finals</span>
+            <svg v-if="achievements.finals > 0" class="w-3.5 h-3.5 text-slate-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <!-- Semis -->
+          <button
+            :disabled="achievements.semis === 0"
+            class="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-left transition-colors disabled:cursor-default"
+            :class="selectedFilter === 'semis' ? 'bg-surface-elevated ring-1 ring-brand-500/40' : achievements.semis > 0 ? 'hover:bg-surface-elevated' : ''"
+            @click="achievements.semis > 0 && toggleFilter('semis')"
+          >
+            <span class="text-xl font-bold w-7 text-right shrink-0" :class="achievements.semis > 0 ? 'text-brand-400' : 'text-slate-700'">{{ achievements.semis }}</span>
+            <span class="flex-1 text-sm" :class="achievements.semis > 0 ? 'text-slate-300' : 'text-slate-600'">Semis</span>
+            <svg v-if="achievements.semis > 0" class="w-3.5 h-3.5 text-slate-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
       </div>
-    </div>
 
-    <!-- Match history -->
-    <div class="space-y-3">
-      <h2 class="text-xs text-slate-500 uppercase tracking-widest">Match history</h2>
+      <!-- Right: Match history or filtered tournament view -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between min-h-[20px]">
+          <h2 class="text-xs text-slate-500 uppercase tracking-widest">{{ rightTitle }}</h2>
+          <button
+            v-if="selectedFilter"
+            class="text-xs text-slate-500 hover:text-white transition-colors"
+            @click="selectedFilter = null"
+          >
+            ← All matches
+          </button>
+        </div>
 
-      <div v-if="!data.matches.length" class="text-slate-400 text-sm">No matches recorded yet.</div>
+        <!-- Filtered: grouped by tournament -->
+        <template v-if="selectedFilter">
+          <div v-if="!visibleTournaments.length" class="text-slate-400 text-sm">No matches found.</div>
 
-      <div class="space-y-2">
-        <MatchScoreCard
-          v-for="m in data.matches"
-          :key="m.id"
-          :match-id="m.id"
-          :date="m.date"
-          :score="m.score"
-          :surface="m.surface"
-          :tournament="m.tournament"
-          :winner-id="m.winner_id"
-          :loser-id="m.loser_id"
-          :winner-name="m.winner_id === id ? player!.name : (m.opponent?.name ?? '—')"
-          :loser-name="m.loser_id === id ? player!.name : (m.opponent?.name ?? '—')"
-          :winner-avatar="m.winner_id === id ? player!.avatar_url : (m.opponent?.avatar_url ?? null)"
-          :loser-avatar="m.loser_id === id ? player!.avatar_url : (m.opponent?.avatar_url ?? null)"
-          :perspective-player-id="id"
-        />
+          <div v-for="tournament in visibleTournaments" :key="tournament" class="space-y-2">
+            <!-- Tournament header -->
+            <div class="flex items-start justify-between gap-3 pt-1 pb-0.5 px-1">
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-white truncate">{{ tournament }}</p>
+                <p class="text-xs text-slate-500">{{ tournamentDateRange(tournament) }}</p>
+              </div>
+              <span
+                class="shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+                :class="tournamentResult(tournament).cls"
+              >
+                {{ tournamentResult(tournament).label }}
+              </span>
+            </div>
+
+            <MatchScoreCard
+              v-for="m in achievementData.byTournament.get(tournament)"
+              :key="m.id"
+              :match-id="m.id"
+              :date="m.date"
+              :score="m.score"
+              :surface="m.surface"
+              :tournament="m.tournament"
+              :winner-id="m.winner_id"
+              :loser-id="m.loser_id"
+              :winner-name="m.winner_id === id ? player!.name : (m.opponent?.name ?? '—')"
+              :loser-name="m.loser_id === id ? player!.name : (m.opponent?.name ?? '—')"
+              :winner-avatar="m.winner_id === id ? player!.avatar_url : (m.opponent?.avatar_url ?? null)"
+              :loser-avatar="m.loser_id === id ? player!.avatar_url : (m.opponent?.avatar_url ?? null)"
+              :perspective-player-id="id"
+            />
+          </div>
+        </template>
+
+        <!-- Default: flat match list -->
+        <template v-else>
+          <div v-if="!data.matches.length" class="text-slate-400 text-sm">No matches recorded yet.</div>
+          <div class="space-y-2">
+            <MatchScoreCard
+              v-for="m in data.matches"
+              :key="m.id"
+              :match-id="m.id"
+              :date="m.date"
+              :score="m.score"
+              :surface="m.surface"
+              :tournament="m.tournament"
+              :winner-id="m.winner_id"
+              :loser-id="m.loser_id"
+              :winner-name="m.winner_id === id ? player!.name : (m.opponent?.name ?? '—')"
+              :loser-name="m.loser_id === id ? player!.name : (m.opponent?.name ?? '—')"
+              :winner-avatar="m.winner_id === id ? player!.avatar_url : (m.opponent?.avatar_url ?? null)"
+              :loser-avatar="m.loser_id === id ? player!.avatar_url : (m.opponent?.avatar_url ?? null)"
+              :perspective-player-id="id"
+            />
+          </div>
+        </template>
       </div>
     </div>
   </div>
