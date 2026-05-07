@@ -106,6 +106,22 @@ const winRate = (wins: number, losses: number) => {
   return total === 0 ? '—' : `${Math.round((wins / total) * 100)}%`
 }
 
+const TIER_LABELS: Record<string, string> = {
+  class_a:  'Class A',
+  class_b:  'Class B',
+  class_c:  'Class C',
+  beginner: 'Beginner',
+  unranked: 'Unranked',
+}
+
+const TIER_COLORS: Record<string, string> = {
+  class_a:  'bg-amber-900/40 text-amber-300 ring-amber-700',
+  class_b:  'bg-red-900/40 text-red-300 ring-red-700',
+  class_c:  'bg-orange-900/40 text-orange-300 ring-orange-700',
+  beginner: 'bg-brand-900/40 text-brand-300 ring-brand-700',
+  unranked: 'bg-slate-800 text-slate-400 ring-slate-600',
+}
+
 useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderboard — TRD Ranking' }] })
 </script>
 
@@ -204,7 +220,7 @@ useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderb
                 <th class="px-4 py-3 text-right w-10">#</th>
                 <th class="px-4 py-3 text-left w-8"></th>
                 <th class="px-4 py-3 text-left">Player</th>
-                <th class="px-4 py-3 text-center">MMR</th>
+                <th class="px-4 py-3 text-center">Class</th>
                 <th class="px-4 py-3 text-center">W</th>
                 <th class="px-4 py-3 text-center">L</th>
                 <th class="px-4 py-3 text-center hidden sm:table-cell">Win %</th>
@@ -225,7 +241,14 @@ useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderb
                       <span class="font-medium text-slate-200 group-hover:text-white transition-colors">{{ player.name }}</span>
                     </NuxtLink>
                   </td>
-                  <td class="px-4 py-3 text-center"><MmrChip :mmr="player.mmr" /></td>
+                  <td class="px-4 py-3 text-center">
+                    <span
+                      class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+                      :class="TIER_COLORS[player.tier] ?? TIER_COLORS.unranked"
+                    >
+                      {{ TIER_LABELS[player.tier] ?? player.tier }}
+                    </span>
+                  </td>
                   <td class="px-4 py-3 text-center text-brand-400 font-medium">{{ player.wins }}</td>
                   <td class="px-4 py-3 text-center text-red-400 font-medium">{{ player.losses }}</td>
                   <td class="px-4 py-3 text-center text-slate-400 hidden sm:table-cell">{{ winRate(player.wins, player.losses) }}</td>

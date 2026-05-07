@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Surface, PlayerTier } from '~/types/database.types'
+import type { Surface } from '~/types/database.types'
 
 interface PlayerRow {
   id: string
@@ -49,17 +49,6 @@ interface PlayerPageData {
   rankDelta: number | null
 }
 
-const TIER_LABELS: Record<PlayerTier, string> = {
-  class_c:  'Class C',
-  beginner: 'Beginner',
-  unranked: 'Unranked',
-}
-
-const TIER_COLORS: Record<PlayerTier, string> = {
-  class_c:  'bg-red-900/40 text-red-300 ring-red-700',
-  beginner: 'bg-brand-900/40 text-brand-300 ring-brand-700',
-  unranked: 'bg-slate-800 text-slate-400 ring-slate-600',
-}
 
 const route = useRoute()
 const id = route.params.id as string
@@ -291,12 +280,9 @@ useHead(() => ({
           </NuxtLink>
         </div>
         <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-400">
-          <MmrChip :mmr="player!.mmr" />
-          <span
-            class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
-            :class="TIER_COLORS[player!.tier]"
-          >
-            {{ TIER_LABELS[player!.tier] }}
+          <span class="inline-flex items-center gap-1.5">
+            <MmrChip :mmr="player!.mmr" />
+            <span class="text-xs text-slate-500">MMR</span>
           </span>
           <RankDelta :delta="data.rankDelta" />
           <span class="text-slate-500">#{{ data.rank }}</span>

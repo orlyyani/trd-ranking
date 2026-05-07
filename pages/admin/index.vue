@@ -16,28 +16,40 @@ const { data: stats } = await useAsyncData('admin-stats', async () => {
 const { data: recentMatches } = await useAsyncData('admin-recent-matches', async () => {
   const { data: matches } = await supabase
     .from('matches')
-    .select('id, date, score, surface, winner_id, loser_id, is_live')
+    .select('id, date, score, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, is_live, status')
     .order('created_at', { ascending: false })
     .limit(8)
 
   if (!matches?.length) return []
 
-  const playerIds = [...new Set(matches.flatMap(m => [m.winner_id, m.loser_id]))]
+  const playerIds = [...new Set(
+    matches.flatMap(m => [m.player1_id, m.player2_id, m.player3_id, m.player4_id]).filter(Boolean),
+  )]
   const { data: players } = await supabase
     .from('players')
     .select('id, name')
     .in('id', playerIds)
 
   const pm = new Map((players ?? []).map(p => [p.id, p.name]))
+  const n = (id: string | null) => (id ? pm.get(id) ?? '—' : null)
 
-  return matches.map(m => ({
-    id: m.id,
-    date: m.date,
-    score: m.score,
-    is_live: m.is_live,
-    winnerName: pm.get(m.winner_id) ?? '—',
-    loserName:  pm.get(m.loser_id)  ?? '—',
-  }))
+  return matches.map(m => {
+    const isDoubles = m.match_type === 'doubles'
+    return {
+      id:       m.id,
+      date:     m.date,
+      score:    m.score,
+      is_live:  m.is_live,
+      status:   m.status,
+      isDoubles,
+      teamA: isDoubles
+        ? [n(m.player1_id), n(m.player3_id)].filter(Boolean).join(' & ')
+        : (n(m.winner_id) ?? n(m.player1_id) ?? '—'),
+      teamB: isDoubles
+        ? [n(m.player2_id), n(m.player4_id)].filter(Boolean).join(' & ')
+        : (n(m.loser_id)  ?? n(m.player2_id) ?? '—'),
+    }
+  })
 })
 
 async function signOut() {
@@ -119,10 +131,13 @@ async function signOut() {
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
               <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
             </span>
+            <!-- Doubles badge -->
+            <span v-if="m.isDoubles" class="shrink-0 rounded px-1 py-0.5 text-xs font-medium bg-slate-800 text-slate-400 ring-1 ring-slate-600">2v2</span>
             <span class="text-sm text-slate-200 truncate">
-              {{ m.winnerName }} <span class="text-slate-500">vs</span> {{ m.loserName }}
+              {{ m.teamA }} <span class="text-slate-500">vs</span> {{ m.teamB }}
             </span>
-            <span class="text-xs text-slate-500 shrink-0 hidden sm:inline">{{ m.score }}</span>
+            <span v-if="m.score" class="text-xs text-slate-500 shrink-0 hidden sm:inline">{{ m.score }}</span>
+            <span v-else-if="m.status !== 'completed'" class="text-xs text-slate-600 shrink-0 hidden sm:inline capitalize">{{ m.status }}</span>
           </div>
           <div class="flex items-center gap-2 shrink-0">
             <NuxtLink
