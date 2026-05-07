@@ -5,7 +5,7 @@ useHead({ title: 'New Player' })
 const config = useRuntimeConfig()
 
 const name = ref('')
-const tier = ref<'unranked' | 'beginner' | 'class_c'>('unranked')
+const tier = ref<'unranked' | 'beginner' | 'class_c' | 'class_b' | 'class_a'>('unranked')
 const avatarUrl = ref('')
 const loading = ref(false)
 const uploading = ref(false)
@@ -13,9 +13,11 @@ const error = ref('')
 const success = ref<{ id: string; name: string } | null>(null)
 
 const TIERS = [
-  { value: 'unranked', label: 'Unranked (1000 MMR)' },
-  { value: 'beginner', label: 'Beginner (1200 MMR)' },
-  { value: 'class_c',  label: 'Class C (1950 MMR)' },
+  { value: 'unranked', label: 'Unranked — Placement Phase (1000 MMR)' },
+  { value: 'beginner', label: 'Beginner — 1000–1499 (starts at 1000)' },
+  { value: 'class_c',  label: 'Class C — 1500–1899 (starts at 1500)' },
+  { value: 'class_b',  label: 'Class B — 1900–2199 (starts at 1900)' },
+  { value: 'class_a',  label: 'Class A / Open — 2200+ (starts at 2200)' },
 ] as const
 
 const fileInput = ref<HTMLInputElement | null>(null)

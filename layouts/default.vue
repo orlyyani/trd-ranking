@@ -2,6 +2,16 @@
 const mobileMenuOpen = ref(false)
 const route = useRoute()
 watch(() => route.path, () => { mobileMenuOpen.value = false })
+
+const user = useSupabaseUser()
+const supabase = useSupabaseClient()
+const isAdmin = ref(false)
+
+watch(user, async (u) => {
+  if (!u) { isAdmin.value = false; return }
+  const { data } = await supabase.from('admins').select('user_id').eq('user_id', u.id).maybeSingle()
+  isAdmin.value = !!data
+}, { immediate: true })
 </script>
 
 <template>
@@ -41,6 +51,11 @@ watch(() => route.path, () => { mobileMenuOpen.value = false })
             </NuxtLink>
           </li>
           <li>
+            <NuxtLink to="/faq" class="nav-link" active-class="nav-link--active">
+              FAQ
+            </NuxtLink>
+          </li>
+          <li v-if="isAdmin">
             <NuxtLink to="/admin" class="nav-link" active-class="nav-link--active">
               Admin
             </NuxtLink>
@@ -90,6 +105,11 @@ watch(() => route.path, () => { mobileMenuOpen.value = false })
               </NuxtLink>
             </li>
             <li>
+              <NuxtLink to="/faq" class="mobile-nav-link" active-class="mobile-nav-link--active" @click="mobileMenuOpen = false">
+                FAQ
+              </NuxtLink>
+            </li>
+            <li v-if="isAdmin">
               <NuxtLink to="/admin" class="mobile-nav-link" active-class="mobile-nav-link--active" @click="mobileMenuOpen = false">
                 Admin
               </NuxtLink>

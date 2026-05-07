@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
 
   const resolvedTier = tier ?? 'unranked'
   if (!isValidTier(resolvedTier)) {
-    throw createError({ statusCode: 400, statusMessage: 'tier must be unranked, beginner, or class_c' })
+    throw createError({ statusCode: 400, statusMessage: 'tier must be unranked, beginner, class_c, class_b, or class_a' })
   }
 
   const startingMmr = TIER_STARTING_MMR[resolvedTier]
