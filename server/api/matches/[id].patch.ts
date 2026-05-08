@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   const {
     player1_id, player2_id, player3_id, player4_id,
     winner_id, score,
-    date, surface, tournament, round,
+    date, surface, tournament, round, ranked,
     stream_url,
     status,
     challonge_match_id, challonge_tournament,
@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
   // ── 4. Fetch existing match (includes doubles columns) ────────────────────
   const { data: existing } = await admin
     .from('matches')
-    .select('id, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, status')
+    .select('id, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, status, ranked')
     .eq('id', id)
     .maybeSingle()
 
@@ -84,6 +84,7 @@ export default defineEventHandler(async (event) => {
   if (surface              !== undefined) patch.surface              = surface
   if (tournament           !== undefined) patch.tournament           = tournament?.trim() || null
   if (round                !== undefined) patch.round                = round || null
+  if (ranked               !== undefined) patch.ranked               = ranked !== false
   if (stream_url           !== undefined) patch.stream_url           = stream_url?.trim() || null
   if (challonge_match_id   !== undefined) patch.challonge_match_id   = challonge_match_id || null
   if (challonge_tournament !== undefined) patch.challonge_tournament = challonge_tournament || null
@@ -119,8 +120,11 @@ export default defineEventHandler(async (event) => {
     ]
     await admin.from('match_players').insert(rows)
 
-    const { error: recalcError } = await admin.rpc('recalculate_all_mmr')
-    if (recalcError) console.error('[matches/patch] recalc error:', recalcError.message)
+    const isRanked = ranked !== undefined ? ranked !== false : (existing.ranked ?? true)
+    if (isRanked) {
+      const { error: recalcError } = await admin.rpc('recalculate_all_mmr')
+      if (recalcError) console.error('[matches/patch] recalc error:', recalcError.message)
+    }
   }
 
   return { matchId: id }

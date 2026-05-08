@@ -167,6 +167,7 @@ useHead({ title: 'Matches', meta: [{ property: 'og:title', content: 'Matches —
               :winner-partner-name="m.match_type === 'doubles' ? (m.winner_id === m.player1_id ? m.player3?.name : m.player4?.name) ?? null : null"
               :loser-partner-name="m.match_type === 'doubles' ? (m.winner_id === m.player1_id ? m.player4?.name : m.player3?.name) ?? null : null"
               :is-live="m.is_live"
+              :ranked="m.ranked"
             />
           </div>
 

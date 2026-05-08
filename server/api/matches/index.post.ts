@@ -24,6 +24,7 @@ export default defineEventHandler(async (event) => {
     match_type = 'singles',
     player1_id, player2_id, player3_id, player4_id,
     date, surface, tournament, round,
+    ranked = true,
     status = 'scheduled',
     winner_id, score,
     stream_url, challonge_match_id, challonge_tournament,
@@ -105,6 +106,7 @@ export default defineEventHandler(async (event) => {
       surface,
       tournament:           tournament?.trim() || null,
       round:                round || null,
+      ranked:               ranked !== false,
       status:               status as MatchStatus,
       stream_url:           stream_url || null,
       challonge_match_id:   challonge_match_id || null,
@@ -135,8 +137,10 @@ export default defineEventHandler(async (event) => {
 
     await admin.from('match_players').insert(matchPlayerRows)
 
-    const { error: recalcError } = await admin.rpc('recalculate_all_mmr')
-    if (recalcError) console.error('[matches/post] recalc error:', recalcError.message)
+    if (ranked !== false) {
+      const { error: recalcError } = await admin.rpc('recalculate_all_mmr')
+      if (recalcError) console.error('[matches/post] recalc error:', recalcError.message)
+    }
 
     if (!isDoubles) {
       const winner  = players.find(p => p.id === winner_id)!

@@ -28,6 +28,7 @@ interface MatchEntry {
   surface: Surface
   tournament: string | null
   round: string | null
+  ranked: boolean
   winner_id: string
   loser_id: string
   role: 'winner' | 'loser'
@@ -99,11 +100,11 @@ const { data, pending, error } = await useAsyncData<PlayerPageData | null>(
     const roleMap = new Map<string, 'winner' | 'loser'>(mpRows.map(r => [r.match_id, r.role]))
     const matchIds = mpRows.map(r => r.match_id)
 
-    type RawMatch = { id: string; date: string; score: string; surface: Surface; tournament: string | null; round: string | null; winner_id: string; loser_id: string }
+    type RawMatch = { id: string; date: string; score: string; surface: Surface; tournament: string | null; round: string | null; ranked: boolean; winner_id: string; loser_id: string }
     const rawMatches: RawMatch[] = matchIds.length
       ? ((await supabase
           .from('matches')
-          .select('id, date, score, surface, tournament, round, winner_id, loser_id')
+          .select('id, date, score, surface, tournament, round, ranked, winner_id, loser_id')
           .in('id', matchIds)
           .order('date', { ascending: false })).data ?? []) as RawMatch[]
       : []
@@ -114,10 +115,12 @@ const { data, pending, error } = await useAsyncData<PlayerPageData | null>(
       const opponentId = role === 'winner' ? m.loser_id : m.winner_id
       const opponent = playerMap.get(opponentId) ?? null
 
-      const stat = surfaceStats[m.surface] ?? { wins: 0, losses: 0 }
-      if (role === 'winner') stat.wins++
-      else stat.losses++
-      surfaceStats[m.surface] = stat
+      if (m.ranked !== false) {
+        const stat = surfaceStats[m.surface] ?? { wins: 0, losses: 0 }
+        if (role === 'winner') stat.wins++
+        else stat.losses++
+        surfaceStats[m.surface] = stat
+      }
 
       return { ...m, role, opponentId, opponent }
     })
@@ -188,7 +191,7 @@ const selectedFilter = ref<AchievementFilter>(null)
 
 const achievementData = computed(() => {
   const matches = data.value?.matches ?? []
-  const tourMatches = matches.filter(m => m.tournament)
+  const tourMatches = matches.filter(m => m.tournament && m.ranked !== false)
 
   const byTournament = new Map<string, MatchEntry[]>()
   for (const m of tourMatches) {
@@ -462,6 +465,7 @@ useHead(() => ({
               :score="m.score"
               :surface="m.surface"
               :tournament="m.tournament"
+              :ranked="m.ranked"
               :winner-id="m.winner_id"
               :loser-id="m.loser_id"
               :winner-name="m.winner_id === id ? player!.name : (m.opponent?.name ?? '—')"
@@ -485,6 +489,7 @@ useHead(() => ({
               :score="m.score"
               :surface="m.surface"
               :tournament="m.tournament"
+              :ranked="m.ranked"
               :winner-id="m.winner_id"
               :loser-id="m.loser_id"
               :winner-name="m.winner_id === id ? player!.name : (m.opponent?.name ?? '—')"
