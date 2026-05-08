@@ -39,6 +39,10 @@ const formattedDate = computed(() =>
   <NuxtLink
     :to="`/matches/${matchId}`"
     class="card flex items-center gap-3 hover:border-surface-border/80 hover:bg-slate-800/50 transition-colors group"
+    :class="{
+      'border-l-4 border-l-brand-500/70 rounded-l-none': ranked === true,
+      'border-l-4 border-l-slate-600/60 rounded-l-none': isFriendly,
+    }"
   >
     <!-- Winner side -->
     <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -58,7 +62,6 @@ const formattedDate = computed(() =>
       <span class="text-sm font-mono font-semibold text-white">{{ score }}</span>
       <SurfaceBadge :surface="surface" class="mt-0.5" />
       <span v-if="isDoubles" class="text-xs text-slate-600 mt-0.5">2v2</span>
-      <span v-if="isFriendly" class="text-xs text-slate-500 mt-0.5 ring-1 ring-slate-600 rounded px-1">Friendly</span>
     </div>
 
     <!-- Loser side -->
@@ -86,6 +89,8 @@ const formattedDate = computed(() =>
         </span>
       </template>
       <template v-else>
+        <span v-if="ranked === true" class="text-brand-400 font-semibold mb-0.5">Ranked</span>
+        <span v-if="isFriendly" class="text-slate-500 mb-0.5">Friendly</span>
         <span>{{ formattedDate }}</span>
         <span v-if="tournament" class="truncate max-w-full">{{ tournament }}</span>
       </template>

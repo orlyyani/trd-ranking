@@ -8,6 +8,7 @@ interface MatchRow {
   player3_id: string | null; player4_id: string | null
   winner_id: string | null; loser_id: string | null
   score: string | null; surface: Surface; tournament: string | null
+  ranked: boolean
   stream_url: string | null; is_live: boolean
   live_score: string | null; status: MatchStatus; created_at: string
 }
@@ -75,7 +76,7 @@ const { data, pending, error } = await useAsyncData<MatchPageData | null>(`match
 
   const { data: match } = await supabase
     .from('matches')
-    .select('id, date, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, score, surface, tournament, stream_url, is_live, live_score, status, created_at')
+    .select('id, date, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, score, surface, tournament, ranked, stream_url, is_live, live_score, status, created_at')
     .eq('id', id).single() as SR<MatchRow>
   if (!match) return null
 
@@ -166,31 +167,33 @@ useHead(() => {
     <div class="card space-y-4">
       <!-- Meta row -->
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          <span>{{ formattedDate }}</span>
-          <span>·</span>
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Date -->
+          <span class="text-sm text-slate-400">{{ formattedDate }}</span>
+
+          <!-- Surface -->
           <SurfaceBadge :surface="data.match.surface" />
-          <template v-if="isDoubles">
-            <span>·</span>
-            <span class="font-medium text-slate-400">Doubles</span>
-          </template>
-          <template v-if="data.match.tournament">
-            <span>·</span>
-            <span>{{ data.match.tournament }}</span>
-          </template>
-          <span>·</span>
-          <span :class="['font-semibold capitalize', isLive ? 'text-red-400' : isCompleted ? 'text-brand-400' : 'text-yellow-400']">
-            <template v-if="isLive">
-              <span class="inline-flex items-center gap-1">
-                <span class="relative flex h-1.5 w-1.5">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
-                </span>
-                Live
-              </span>
-            </template>
-            <template v-else>{{ data.match.status }}</template>
+
+          <!-- Match type -->
+          <span v-if="isDoubles" class="text-xs font-medium text-slate-300 bg-slate-700/60 ring-1 ring-slate-600/50 rounded-full px-2.5 py-0.5">Doubles</span>
+
+          <!-- Ranked / Friendly -->
+          <span v-if="data.match.ranked !== false" class="text-xs font-semibold text-brand-400 bg-brand-400/10 ring-1 ring-brand-400/25 rounded-full px-2.5 py-0.5">Ranked</span>
+          <span v-else class="text-xs text-slate-400 bg-slate-700/50 ring-1 ring-slate-600/50 rounded-full px-2.5 py-0.5">Friendly</span>
+
+          <!-- Status -->
+          <span v-if="isLive" class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-400 bg-red-400/10 ring-1 ring-red-400/25 rounded-full px-2.5 py-0.5">
+            <span class="relative flex h-1.5 w-1.5">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+            </span>
+            Live
           </span>
+          <span v-else-if="isCompleted" class="text-xs text-slate-500 bg-slate-700/40 ring-1 ring-slate-600/40 rounded-full px-2.5 py-0.5">Completed</span>
+          <span v-else class="text-xs font-medium text-yellow-500/80 bg-yellow-500/10 ring-1 ring-yellow-500/25 rounded-full px-2.5 py-0.5">Scheduled</span>
+
+          <!-- Tournament -->
+          <span v-if="data.match.tournament" class="text-xs text-slate-400 truncate max-w-[160px]">{{ data.match.tournament }}</span>
         </div>
         <NuxtLink
           v-if="user"
@@ -215,9 +218,10 @@ useHead(() => {
             <div class="flex items-center gap-1 sm:gap-2 mt-1 flex-wrap">
               <RankBadge v-if="teamA.main" :tier="teamA.main.tier" :size="32" />
               <MmrDelta v-if="isCompleted" :delta="mmrDelta(teamA.main?.id)" />
-              <template v-if="isDoubles && teamA.partner && isCompleted">
+              <template v-if="isDoubles && teamA.partner">
                 <span class="text-slate-600 text-xs">·</span>
-                <MmrDelta :delta="mmrDelta(teamA.partner.id)" />
+                <RankBadge :tier="teamA.partner.tier" :size="32" />
+                <MmrDelta v-if="isCompleted" :delta="mmrDelta(teamA.partner.id)" />
               </template>
               <span v-if="isCompleted && teamAWon" class="text-xs text-brand-400 font-semibold">W</span>
               <span v-else-if="isCompleted && !teamAWon && data.match.winner_id" class="text-xs text-red-400 font-semibold">L</span>
@@ -253,8 +257,9 @@ useHead(() => {
               &amp; {{ teamB.partner.name }}
             </NuxtLink>
             <div class="flex items-center gap-1 sm:gap-2 mt-1 justify-end flex-wrap">
-              <template v-if="isDoubles && teamB.partner && isCompleted">
-                <MmrDelta :delta="mmrDelta(teamB.partner.id)" />
+              <template v-if="isDoubles && teamB.partner">
+                <MmrDelta v-if="isCompleted" :delta="mmrDelta(teamB.partner.id)" />
+                <RankBadge :tier="teamB.partner.tier" :size="32" />
                 <span class="text-slate-600 text-xs">·</span>
               </template>
               <MmrDelta v-if="isCompleted" :delta="mmrDelta(teamB.main?.id)" />

@@ -29,11 +29,20 @@ interface MatchEntry {
   tournament: string | null
   round: string | null
   ranked: boolean
+  match_type: 'singles' | 'doubles'
   winner_id: string
   loser_id: string
+  player1_id: string | null
+  player2_id: string | null
+  player3_id: string | null
+  player4_id: string | null
   role: 'winner' | 'loser'
   opponentId: string
   opponent: OpponentInfo | null
+  winnerInfo: OpponentInfo | null
+  loserInfo: OpponentInfo | null
+  winnerPartner: OpponentInfo | null
+  loserPartner: OpponentInfo | null
 }
 
 interface MmrEntry {
@@ -100,11 +109,18 @@ const { data, pending, error } = await useAsyncData<PlayerPageData | null>(
     const roleMap = new Map<string, 'winner' | 'loser'>(mpRows.map(r => [r.match_id, r.role]))
     const matchIds = mpRows.map(r => r.match_id)
 
-    type RawMatch = { id: string; date: string; score: string; surface: Surface; tournament: string | null; round: string | null; ranked: boolean; winner_id: string; loser_id: string }
+    type RawMatch = {
+      id: string; date: string; score: string; surface: Surface
+      tournament: string | null; round: string | null
+      ranked: boolean; match_type: string
+      player1_id: string | null; player2_id: string | null
+      player3_id: string | null; player4_id: string | null
+      winner_id: string; loser_id: string
+    }
     const rawMatches: RawMatch[] = matchIds.length
       ? ((await supabase
           .from('matches')
-          .select('id, date, score, surface, tournament, round, ranked, winner_id, loser_id')
+          .select('id, date, score, surface, tournament, round, ranked, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id')
           .in('id', matchIds)
           .order('date', { ascending: false })).data ?? []) as RawMatch[]
       : []
@@ -115,6 +131,21 @@ const { data, pending, error } = await useAsyncData<PlayerPageData | null>(
       const opponentId = role === 'winner' ? m.loser_id : m.winner_id
       const opponent = playerMap.get(opponentId) ?? null
 
+      const winnerInfo = playerMap.get(m.winner_id) ?? null
+      const loserInfo  = playerMap.get(m.loser_id)  ?? null
+
+      let winnerPartner: OpponentInfo | null = null
+      let loserPartner:  OpponentInfo | null = null
+      if (m.match_type === 'doubles') {
+        if (m.winner_id === m.player1_id) {
+          winnerPartner = m.player3_id ? (playerMap.get(m.player3_id) ?? null) : null
+          loserPartner  = m.player4_id ? (playerMap.get(m.player4_id) ?? null) : null
+        } else {
+          winnerPartner = m.player4_id ? (playerMap.get(m.player4_id) ?? null) : null
+          loserPartner  = m.player3_id ? (playerMap.get(m.player3_id) ?? null) : null
+        }
+      }
+
       if (m.ranked !== false) {
         const stat = surfaceStats[m.surface] ?? { wins: 0, losses: 0 }
         if (role === 'winner') stat.wins++
@@ -122,7 +153,12 @@ const { data, pending, error } = await useAsyncData<PlayerPageData | null>(
         surfaceStats[m.surface] = stat
       }
 
-      return { ...m, role, opponentId, opponent }
+      return {
+        ...m,
+        match_type: m.match_type as 'singles' | 'doubles',
+        role, opponentId, opponent,
+        winnerInfo, loserInfo, winnerPartner, loserPartner,
+      }
     })
 
     return { player, matches, surfaceStats, mmrHistory: mmrRows, rank: currentRank, rankDelta }
@@ -173,6 +209,35 @@ const hasDoubles = computed(() => {
   const p = player.value
   return p ? (p.doubles_wins + p.doubles_losses) > 0 : false
 })
+
+const friendlyStats = computed(() => {
+  const ms = data.value?.matches ?? []
+  let wins = 0, losses = 0
+  for (const m of ms) {
+    if (m.ranked === false) {
+      if (m.role === 'winner') wins++
+      else losses++
+    }
+  }
+  return { wins, losses }
+})
+
+const hasFriendly = computed(() => {
+  const { wins, losses } = friendlyStats.value
+  return wins + losses > 0
+})
+
+const friendlyWinRate = computed(() => {
+  const { wins, losses } = friendlyStats.value
+  const total = wins + losses
+  return total === 0 ? '—' : `${Math.round((wins / total) * 100)}%`
+})
+
+function effectivePerspectiveId(m: MatchEntry): string {
+  if (m.match_type !== 'doubles') return id
+  const onTeamA = m.player1_id === id || m.player3_id === id
+  return onTeamA ? (m.player1_id ?? id) : (m.player2_id ?? id)
+}
 
 const TIER_MMR_COLOR: Record<string, string> = {
   class_a:  'text-amber-400',
@@ -310,6 +375,13 @@ useHead(() => ({
             <span><span class="text-brand-400 font-semibold">{{ player!.doubles_wins }}</span> W</span>
             <span><span class="text-red-400 font-semibold">{{ player!.doubles_losses }}</span> L</span>
             <span>{{ doublesWinRate }}</span>
+          </template>
+          <template v-if="hasFriendly">
+            <span class="text-slate-700">·</span>
+            <span class="text-slate-600 text-xs uppercase tracking-wider">Friendly</span>
+            <span><span class="text-brand-400 font-semibold">{{ friendlyStats.wins }}</span> W</span>
+            <span><span class="text-red-400 font-semibold">{{ friendlyStats.losses }}</span> L</span>
+            <span>{{ friendlyWinRate }}</span>
           </template>
         </div>
       </div>
@@ -468,11 +540,13 @@ useHead(() => ({
               :ranked="m.ranked"
               :winner-id="m.winner_id"
               :loser-id="m.loser_id"
-              :winner-name="m.winner_id === id ? player!.name : (m.opponent?.name ?? '—')"
-              :loser-name="m.loser_id === id ? player!.name : (m.opponent?.name ?? '—')"
-              :winner-avatar="m.winner_id === id ? player!.avatar_url : (m.opponent?.avatar_url ?? null)"
-              :loser-avatar="m.loser_id === id ? player!.avatar_url : (m.opponent?.avatar_url ?? null)"
-              :perspective-player-id="id"
+              :winner-name="m.winnerInfo?.name ?? '—'"
+              :loser-name="m.loserInfo?.name ?? '—'"
+              :winner-avatar="m.winnerInfo?.avatar_url ?? null"
+              :loser-avatar="m.loserInfo?.avatar_url ?? null"
+              :winner-partner-name="m.winnerPartner?.name ?? null"
+              :loser-partner-name="m.loserPartner?.name ?? null"
+              :perspective-player-id="effectivePerspectiveId(m)"
             />
           </div>
         </template>
@@ -492,11 +566,13 @@ useHead(() => ({
               :ranked="m.ranked"
               :winner-id="m.winner_id"
               :loser-id="m.loser_id"
-              :winner-name="m.winner_id === id ? player!.name : (m.opponent?.name ?? '—')"
-              :loser-name="m.loser_id === id ? player!.name : (m.opponent?.name ?? '—')"
-              :winner-avatar="m.winner_id === id ? player!.avatar_url : (m.opponent?.avatar_url ?? null)"
-              :loser-avatar="m.loser_id === id ? player!.avatar_url : (m.opponent?.avatar_url ?? null)"
-              :perspective-player-id="id"
+              :winner-name="m.winnerInfo?.name ?? '—'"
+              :loser-name="m.loserInfo?.name ?? '—'"
+              :winner-avatar="m.winnerInfo?.avatar_url ?? null"
+              :loser-avatar="m.loserInfo?.avatar_url ?? null"
+              :winner-partner-name="m.winnerPartner?.name ?? null"
+              :loser-partner-name="m.loserPartner?.name ?? null"
+              :perspective-player-id="effectivePerspectiveId(m)"
             />
           </div>
         </template>

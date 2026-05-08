@@ -309,6 +309,7 @@ useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderb
             :loser-avatar="lastMatchDisplay?.loser?.avatar_url ?? null"
             :winner-partner-name="lastMatchDisplay?.winnerPartner?.name ?? null"
             :loser-partner-name="lastMatchDisplay?.loserPartner?.name ?? null"
+            :ranked="lastMatch.ranked"
             :is-live="lastMatch.is_live"
           />
         </div>
