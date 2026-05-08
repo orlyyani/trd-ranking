@@ -1,7 +1,7 @@
 /**
  * Pure MMR calculation utilities — no DB access, fully testable.
  * Variable K-factor per TENNIS_ELO_SYSTEM.md:
- *   K=40 for first 10 matches, K=20 after.
+ *   K=40 for first 5 matches, K=20 after.
  */
 
 export const TIER_STARTING_MMR = {
@@ -21,7 +21,7 @@ export function isValidTier(value: unknown): value is PlayerTier {
 }
 
 function kFactor(matchCount: number): number {
-  return matchCount < 10 ? 40 : 20
+  return matchCount < 5 ? 40 : 20
 }
 
 export function expectedScore(ratingA: number, ratingB: number): number {
