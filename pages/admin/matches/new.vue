@@ -161,7 +161,7 @@ const formattedDate = computed(() =>
     <form class="space-y-6" @submit.prevent="requestConfirm">
 
       <!-- Match type + Ranked toggle -->
-      <div class="flex flex-wrap items-end gap-6">
+      <div class="flex flex-wrap items-start gap-6">
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-2">Match type</label>
           <div class="flex rounded-lg overflow-hidden border border-surface-border w-fit">

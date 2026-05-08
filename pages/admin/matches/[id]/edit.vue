@@ -48,9 +48,28 @@ const usedIds = computed(() =>
   new Set([info.player1_id, info.player2_id, info.player3_id, info.player4_id].filter(Boolean)),
 )
 
-const infoLoading = ref(false)
-const infoError   = ref('')
-const infoSuccess = ref(false)
+const infoLoading       = ref(false)
+const infoError         = ref('')
+const infoSuccess       = ref(false)
+const showRankedWarning   = ref(false)
+const showCompleteConfirm = ref(false)
+
+function trySetRanked() {
+  if (!info.ranked) showRankedWarning.value = true
+  else info.ranked = false
+}
+
+function requestCompleteConfirm() {
+  const effectiveWinnerId = isDoubles.value
+    ? (winning_team.value === 'A' ? info.player1_id : winning_team.value === 'B' ? info.player2_id : '')
+    : winner_id.value
+
+  if (!effectiveWinnerId) { scoreError.value = isDoubles.value ? 'Select the winning team.' : 'Select a winner.'; return }
+  if (!finalScore.value.trim()) { scoreError.value = 'Enter the final score.'; return }
+
+  scoreError.value = ''
+  showCompleteConfirm.value = true
+}
 
 async function saveInfo() {
   infoError.value   = ''
@@ -172,6 +191,12 @@ const gridCols = computed(() => {
   if (showDetails.value)             return 'lg:grid-cols-[1fr_340px]'
   if (hasEmbed)                      return 'lg:grid-cols-[340px_minmax(0,1fr)]'
   return 'lg:grid-cols-[340px]'
+})
+
+const completeWinnerLabel = computed(() => {
+  if (isDoubles.value)
+    return winning_team.value === 'A' ? teamALabel.value : winning_team.value === 'B' ? teamBLabel.value : ''
+  return playerName(winner_id.value)
 })
 
 const completedWinnerName = computed(() => {
@@ -307,7 +332,7 @@ const completedWinnerName = computed(() => {
           <div class="flex rounded-lg overflow-hidden border border-surface-border w-fit">
             <button type="button"
               :class="['px-5 py-2 text-sm font-medium transition-colors', info.ranked ? 'bg-brand-600 text-white' : 'bg-surface text-slate-400 hover:text-white']"
-              @click="info.ranked = true">Ranked</button>
+              @click="trySetRanked">Ranked</button>
             <button type="button"
               :class="['px-5 py-2 text-sm font-medium transition-colors', !info.ranked ? 'bg-slate-700 text-white' : 'bg-surface text-slate-400 hover:text-white']"
               @click="info.ranked = false">Friendly</button>
@@ -396,8 +421,8 @@ const completedWinnerName = computed(() => {
               class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
 
-          <button type="button" :disabled="scoreLoading" class="w-full rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white transition-colors" @click="completeMatch">
-            {{ scoreLoading ? 'Saving…' : 'Complete & update MMR' }}
+          <button type="button" :disabled="scoreLoading" class="w-full rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white transition-colors" @click="requestCompleteConfirm">
+            {{ scoreLoading ? 'Saving…' : info.ranked ? 'Complete & update MMR' : 'Complete match' }}
           </button>
         </div>
 
@@ -422,4 +447,146 @@ const completedWinnerName = computed(() => {
       </div>
     </div>
   </div>
+
+  <!-- ── Complete match confirmation modal ─────────────────────────────────── -->
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition-opacity duration-150"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-150"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="showCompleteConfirm"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        @click.self="showCompleteConfirm = false"
+      >
+        <div class="bg-surface-elevated border border-surface-border rounded-xl shadow-2xl w-full max-w-md space-y-5 p-6">
+
+          <div>
+            <h2 class="text-lg font-semibold text-white">Review match details</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Double-check everything before confirming.</p>
+          </div>
+
+          <!-- Ranked / Friendly badge -->
+          <div
+            class="rounded-lg px-4 py-3 flex items-center gap-3 ring-1"
+            :class="info.ranked ? 'bg-brand-900/40 ring-brand-700' : 'bg-slate-800/60 ring-slate-600'"
+          >
+            <div class="h-2.5 w-2.5 rounded-full shrink-0" :class="info.ranked ? 'bg-brand-400' : 'bg-slate-400'" />
+            <div>
+              <p class="text-sm font-semibold" :class="info.ranked ? 'text-brand-300' : 'text-slate-300'">
+                {{ info.ranked ? 'Ranked match' : 'Friendly match' }}
+              </p>
+              <p class="text-xs mt-0.5" :class="info.ranked ? 'text-brand-400/70' : 'text-slate-500'">
+                {{ info.ranked ? 'MMR will be updated after this match.' : 'No MMR changes — recorded for history only.' }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Details -->
+          <dl class="space-y-2 text-sm">
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">Type</dt>
+              <dd class="text-slate-200 capitalize text-right">{{ isDoubles ? 'Doubles' : 'Singles' }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">{{ isDoubles ? 'Team A' : 'Player 1' }}</dt>
+              <dd class="text-slate-200 text-right truncate">{{ isDoubles ? teamALabel : playerName(info.player1_id) }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">{{ isDoubles ? 'Team B' : 'Player 2' }}</dt>
+              <dd class="text-slate-200 text-right truncate">{{ isDoubles ? teamBLabel : playerName(info.player2_id) }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">Date</dt>
+              <dd class="text-slate-200 text-right">{{ info.date }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">Surface</dt>
+              <dd class="text-slate-200 capitalize text-right">{{ info.surface }}</dd>
+            </div>
+            <template v-if="info.tournament.trim()">
+              <div class="flex justify-between gap-4">
+                <dt class="text-slate-500 shrink-0">Tournament</dt>
+                <dd class="text-slate-200 text-right truncate">{{ info.tournament }}</dd>
+              </div>
+              <div v-if="info.round" class="flex justify-between gap-4">
+                <dt class="text-slate-500 shrink-0">Round</dt>
+                <dd class="text-slate-200 capitalize text-right">{{ info.round }}</dd>
+              </div>
+            </template>
+            <div class="border-t border-surface-border pt-2 flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">Winner</dt>
+              <dd class="text-brand-400 font-medium text-right truncate">{{ completeWinnerLabel }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">Score</dt>
+              <dd class="text-white font-mono font-semibold text-right">{{ finalScore }}</dd>
+            </div>
+          </dl>
+
+          <div class="flex gap-3 pt-1">
+            <button
+              type="button"
+              class="flex-1 rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+              @click="showCompleteConfirm = false"
+            >Go back</button>
+            <button
+              type="button"
+              :disabled="scoreLoading"
+              class="flex-1 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 px-4 py-2 text-sm font-medium text-white transition-colors"
+              @click="showCompleteConfirm = false; completeMatch()"
+            >{{ info.ranked ? 'Confirm & update MMR' : 'Confirm & complete' }}</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
+  <!-- ── Ranked warning modal ────────────────────────────────────────────────── -->
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition-opacity duration-150"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-150"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="showRankedWarning"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        @click.self="showRankedWarning = false"
+      >
+        <div class="bg-surface-elevated border border-surface-border rounded-xl shadow-2xl w-full max-w-sm space-y-4 p-6">
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 flex-shrink-0 rounded-full bg-amber-500/15 p-2">
+              <svg class="h-5 w-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold text-white">Change to Ranked?</h3>
+              <p class="mt-1 text-sm text-slate-400">This match will affect MMR when saved. Make sure the result is finalised before switching to ranked.</p>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <button
+              type="button"
+              class="flex-1 rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+              @click="showRankedWarning = false"
+            >Cancel</button>
+            <button
+              type="button"
+              class="flex-1 rounded-lg bg-amber-600 hover:bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition-colors"
+              @click="info.ranked = true; showRankedWarning = false"
+            >Yes, set Ranked</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
