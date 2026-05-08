@@ -1,6 +1,14 @@
 <script setup lang="ts">
 useHead({ title: 'FAQ — TRD Ranking' })
 
+const TIERS = [
+  { tier: 'class_a',  label: 'Class A / Open', range: '2200+ MMR',          color: 'text-amber-400' },
+  { tier: 'class_b',  label: 'Class B',         range: '1900 – 2199 MMR',    color: 'text-violet-400' },
+  { tier: 'class_c',  label: 'Class C',         range: '1500 – 1899 MMR',    color: 'text-blue-400' },
+  { tier: 'beginner', label: 'Beginner',         range: '1000 – 1499 MMR',    color: 'text-brand-400' },
+  { tier: 'unranked', label: 'Unranked',         range: 'Placement Phase — fewer than 5 matches', color: 'text-slate-400' },
+]
+
 const faqs = [
   {
     question: 'How are rankings determined?',
@@ -15,7 +23,7 @@ const faqs = [
   {
     question: 'What is the Placement Phase?',
     answer:
-      'New players start in the Placement Phase (Unranked) with a provisional MMR of 1000. After playing their first 10 matches, their rating stabilises and they receive their official tier placement.',
+      'New players start in the Placement Phase (Unranked) with a provisional MMR of 1000. After playing their first 5 matches, their rating stabilises and they receive their official tier placement.',
   },
   {
     question: 'Why do I gain or lose different amounts per match?',
@@ -25,12 +33,12 @@ const faqs = [
   {
     question: 'What is the K-factor?',
     answer:
-      'The K-factor controls how much a single match can move your rating. It is set to 40 for your first 10 matches (placement), then drops to 20 afterwards. A higher K means faster movement early on while your rating is still uncertain.',
+      'The K-factor controls how much a single match can move your rating. It is set to 40 for your first 5 matches (placement), then drops to 20 afterwards. A higher K means faster movement early on while your rating is still uncertain.',
   },
   {
     question: 'How quickly does my rating change?',
     answer:
-      'During placement (first 10 matches) your rating moves faster (K=40). After that it stabilises (K=20). Over time, consistent results against similarly-rated opponents will gradually shift your ranking to its true level.',
+      'During placement (first 5 matches) your rating moves faster (K=40). After that it stabilises (K=20). Over time, consistent results against similarly-rated opponents will gradually shift your ranking to its true level.',
   },
   {
     question: 'Can I drop out of my current tier?',
@@ -72,25 +80,16 @@ function toggle(i: number) {
     <div class="card space-y-3">
       <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wide">Ranking Tiers</h2>
       <div class="divide-y divide-surface-border">
-        <div class="flex items-center justify-between py-2.5 text-sm">
-          <span class="text-slate-300 font-medium">Unranked</span>
-          <span class="text-slate-500">Placement Phase — &lt;10 matches</span>
-        </div>
-        <div class="flex items-center justify-between py-2.5 text-sm">
-          <span class="text-brand-300 font-medium">Beginner</span>
-          <span class="text-slate-500">1000 – 1499 MMR</span>
-        </div>
-        <div class="flex items-center justify-between py-2.5 text-sm">
-          <span class="text-orange-300 font-medium">Class C</span>
-          <span class="text-slate-500">1500 – 1899 MMR</span>
-        </div>
-        <div class="flex items-center justify-between py-2.5 text-sm">
-          <span class="text-red-300 font-medium">Class B</span>
-          <span class="text-slate-500">1900 – 2199 MMR</span>
-        </div>
-        <div class="flex items-center justify-between py-2.5 text-sm">
-          <span class="text-amber-300 font-medium">Class A / Open</span>
-          <span class="text-slate-500">2200+ MMR</span>
+        <div
+          v-for="t in TIERS"
+          :key="t.tier"
+          class="flex items-center gap-4 py-3"
+        >
+          <RankBadge :tier="t.tier" :size="52" />
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold" :class="t.color">{{ t.label }}</p>
+            <p class="text-xs text-slate-500 mt-0.5">{{ t.range }}</p>
+          </div>
         </div>
       </div>
     </div>

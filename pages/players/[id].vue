@@ -171,6 +171,16 @@ const hasDoubles = computed(() => {
   return p ? (p.doubles_wins + p.doubles_losses) > 0 : false
 })
 
+const TIER_MMR_COLOR: Record<string, string> = {
+  class_a:  'text-amber-400',
+  class_b:  'text-violet-400',
+  class_c:  'text-blue-400',
+  beginner: 'text-brand-400',
+  unranked: 'text-slate-400',
+}
+
+const mmrColor = computed(() => TIER_MMR_COLOR[player.value?.tier ?? ''] ?? 'text-slate-400')
+
 // ── Tournament achievements ───────────────────────────────────────────────────
 
 type AchievementFilter = 'entered' | 'champion' | 'finals' | 'semis' | null
@@ -282,7 +292,7 @@ useHead(() => ({
         <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-400">
           <RankBadge :tier="player!.tier" :size="44" />
           <span class="inline-flex items-baseline gap-1">
-            <span class="text-lg font-mono font-semibold text-white">{{ player!.mmr }}</span>
+            <span class="text-lg font-mono font-semibold" :class="mmrColor">{{ player!.mmr }}</span>
             <span class="text-xs text-slate-500">MMR</span>
           </span>
           <RankDelta :delta="data.rankDelta" />
