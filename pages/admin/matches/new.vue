@@ -14,6 +14,7 @@ const ROUNDS   = ['group', 'quarterfinal', 'semifinal', 'final'] as const
 
 const form = reactive({
   match_type:   'singles' as 'singles' | 'doubles',
+  ranked:        true,
   player1_id:   '',
   player2_id:   '',
   player3_id:   '', // doubles: Team A partner
@@ -31,9 +32,10 @@ const form = reactive({
   score:         '',
 })
 
-const loading = ref(false)
-const error   = ref('')
-const success = ref<{ matchId: string; status: string } | null>(null)
+const loading     = ref(false)
+const error       = ref('')
+const success     = ref<{ matchId: string; status: string } | null>(null)
+const showConfirm = ref(false)
 
 const isDoubles  = computed(() => form.match_type === 'doubles')
 const completing = computed(() => form.status === 'completed')
@@ -55,14 +57,21 @@ const teamBLabel = computed(() =>
     .filter(Boolean).join(' & ') || 'Team B',
 )
 
+const winnerLabel = computed(() => {
+  if (!completing.value) return ''
+  if (isDoubles.value) return form.winning_team === 'A' ? teamALabel.value : teamBLabel.value
+  return form.winner_id ? playerName(form.winner_id) : ''
+})
+
 function resetPlayerFields() {
   form.player1_id = ''; form.player2_id = ''
   form.player3_id = ''; form.player4_id = ''
   form.winner_id  = ''; form.winning_team = ''
 }
 
-async function submit() {
-  error.value = ''; success.value = null
+// ── Validation → opens confirmation modal ──────────────────────────────────────
+function requestConfirm() {
+  error.value = ''
 
   if (!form.player1_id || !form.player2_id) { error.value = 'Select the main players for each team.'; return }
 
@@ -79,7 +88,15 @@ async function submit() {
 
   if (completing.value && !form.score.trim()) { error.value = 'Enter the final score.'; return }
 
+  showConfirm.value = true
+}
+
+// ── Actual API call — only reached after confirmation ──────────────────────────
+async function submit() {
+  showConfirm.value = false
   loading.value = true
+  error.value   = ''
+
   try {
     const effectiveWinnerId = isDoubles.value
       ? (form.winning_team === 'A' ? form.player1_id : form.player2_id)
@@ -94,6 +111,7 @@ async function submit() {
       status:       form.status,
       tournament:   form.tournament.trim() || undefined,
       round:        form.round || undefined,
+      ranked:       form.ranked,
       stream_url:   form.stream_url.trim() || undefined,
       challonge_match_id:   form.challonge_match_id.trim()   || undefined,
       challonge_tournament: form.challonge_tournament.trim() || undefined,
@@ -116,6 +134,12 @@ async function submit() {
     loading.value = false
   }
 }
+
+const formattedDate = computed(() =>
+  form.date
+    ? new Date(form.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '—',
+)
 </script>
 
 <template>
@@ -134,17 +158,31 @@ async function submit() {
       <NuxtLink :to="`/matches/${success.matchId}`" class="text-xs text-brand-400 hover:text-brand-300 underline-offset-2 hover:underline">View match →</NuxtLink>
     </div>
 
-    <form class="space-y-6" @submit.prevent="submit">
+    <form class="space-y-6" @submit.prevent="requestConfirm">
 
-      <!-- Match type -->
-      <div>
-        <label class="block text-sm font-medium text-slate-300 mb-2">Match type</label>
-        <div class="flex rounded-lg overflow-hidden border border-surface-border w-fit">
-          <button
-            v-for="t in (['singles', 'doubles'] as const)" :key="t" type="button"
-            :class="['px-6 py-2 text-sm font-medium capitalize transition-colors', form.match_type === t ? 'bg-brand-600 text-white' : 'bg-surface text-slate-400 hover:text-white']"
-            @click="form.match_type = t; resetPlayerFields()"
-          >{{ t }}</button>
+      <!-- Match type + Ranked toggle -->
+      <div class="flex flex-wrap items-end gap-6">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Match type</label>
+          <div class="flex rounded-lg overflow-hidden border border-surface-border w-fit">
+            <button
+              v-for="t in (['singles', 'doubles'] as const)" :key="t" type="button"
+              :class="['px-6 py-2 text-sm font-medium capitalize transition-colors', form.match_type === t ? 'bg-brand-600 text-white' : 'bg-surface text-slate-400 hover:text-white']"
+              @click="form.match_type = t; resetPlayerFields()"
+            >{{ t }}</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Match mode</label>
+          <div class="flex rounded-lg overflow-hidden border border-surface-border w-fit">
+            <button type="button"
+              :class="['px-5 py-2 text-sm font-medium transition-colors', form.ranked ? 'bg-brand-600 text-white' : 'bg-surface text-slate-400 hover:text-white']"
+              @click="form.ranked = true">Ranked</button>
+            <button type="button"
+              :class="['px-5 py-2 text-sm font-medium transition-colors', !form.ranked ? 'bg-slate-700 text-white' : 'bg-surface text-slate-400 hover:text-white']"
+              @click="form.ranked = false">Friendly</button>
+          </div>
+          <p v-if="!form.ranked" class="mt-1 text-xs text-slate-500">No MMR changes — recorded for history only.</p>
         </div>
       </div>
 
@@ -312,4 +350,126 @@ async function submit() {
       </button>
     </form>
   </div>
+
+  <!-- ── Confirmation modal ──────────────────────────────────────────────────── -->
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition-opacity duration-150"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-100"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="showConfirm"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        @click.self="showConfirm = false"
+      >
+        <div class="bg-surface-elevated border border-surface-border rounded-xl shadow-2xl w-full max-w-md space-y-5 p-6">
+
+          <!-- Header -->
+          <div>
+            <h2 class="text-lg font-semibold text-white">Review match details</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Double-check everything before confirming.</p>
+          </div>
+
+          <!-- Ranked / Friendly highlight -->
+          <div
+            class="rounded-lg px-4 py-3 flex items-center gap-3 ring-1"
+            :class="form.ranked
+              ? 'bg-brand-900/40 ring-brand-700'
+              : 'bg-slate-800/60 ring-slate-600'"
+          >
+            <div
+              class="h-2.5 w-2.5 rounded-full shrink-0"
+              :class="form.ranked ? 'bg-brand-400' : 'bg-slate-400'"
+            />
+            <div>
+              <p class="text-sm font-semibold" :class="form.ranked ? 'text-brand-300' : 'text-slate-300'">
+                {{ form.ranked ? 'Ranked match' : 'Friendly match' }}
+              </p>
+              <p class="text-xs mt-0.5" :class="form.ranked ? 'text-brand-400/70' : 'text-slate-500'">
+                {{ form.ranked ? 'MMR will be updated after this match.' : 'No MMR changes — recorded for history only.' }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Details grid -->
+          <dl class="space-y-2 text-sm">
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">Type</dt>
+              <dd class="text-slate-200 capitalize text-right">{{ form.match_type }}</dd>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">Status</dt>
+              <dd class="text-slate-200 capitalize text-right">{{ form.status }}</dd>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">{{ isDoubles ? 'Team A' : 'Player 1' }}</dt>
+              <dd class="text-slate-200 text-right truncate">{{ isDoubles ? teamALabel : playerName(form.player1_id) }}</dd>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">{{ isDoubles ? 'Team B' : 'Player 2' }}</dt>
+              <dd class="text-slate-200 text-right truncate">{{ isDoubles ? teamBLabel : playerName(form.player2_id) }}</dd>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">Date</dt>
+              <dd class="text-slate-200 text-right">{{ formattedDate }}</dd>
+            </div>
+
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500 shrink-0">Surface</dt>
+              <dd class="text-slate-200 capitalize text-right">{{ form.surface }}</dd>
+            </div>
+
+            <template v-if="form.tournament.trim()">
+              <div class="flex justify-between gap-4">
+                <dt class="text-slate-500 shrink-0">Tournament</dt>
+                <dd class="text-slate-200 text-right truncate">{{ form.tournament }}</dd>
+              </div>
+              <div v-if="form.round" class="flex justify-between gap-4">
+                <dt class="text-slate-500 shrink-0">Round</dt>
+                <dd class="text-slate-200 capitalize text-right">{{ form.round }}</dd>
+              </div>
+            </template>
+
+            <template v-if="completing">
+              <div class="border-t border-surface-border pt-2 flex justify-between gap-4">
+                <dt class="text-slate-500 shrink-0">Winner</dt>
+                <dd class="text-brand-400 font-medium text-right truncate">{{ winnerLabel }}</dd>
+              </div>
+              <div class="flex justify-between gap-4">
+                <dt class="text-slate-500 shrink-0">Score</dt>
+                <dd class="text-white font-mono font-semibold text-right">{{ form.score }}</dd>
+              </div>
+            </template>
+          </dl>
+
+          <!-- Actions -->
+          <div class="flex gap-3 pt-1">
+            <button
+              type="button"
+              class="flex-1 rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+              @click="showConfirm = false"
+            >
+              Go back
+            </button>
+            <button
+              type="button"
+              :disabled="loading"
+              class="flex-1 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 px-4 py-2 text-sm font-medium text-white transition-colors"
+              @click="submit"
+            >
+              {{ form.status === 'scheduled' ? 'Confirm & schedule' : form.status === 'live' ? 'Confirm & start' : 'Confirm & record' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>

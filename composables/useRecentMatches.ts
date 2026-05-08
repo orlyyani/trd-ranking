@@ -6,6 +6,7 @@ export interface RecentMatch {
   score: string | null
   surface: Surface
   tournament: string | null
+  ranked: boolean
   match_type: MatchType
   player1_id: string | null
   player2_id: string | null
@@ -46,7 +47,7 @@ export const useRecentMatches = (options: UseRecentMatchesOptions = {}) => {
       const [matchRes, countRes] = await Promise.all([
         supabase
           .from('matches')
-          .select('id, date, score, surface, tournament, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, is_live, live_score, stream_url, status, created_at')
+          .select('id, date, score, surface, tournament, ranked, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, is_live, live_score, stream_url, status, created_at')
           .neq('status', 'scheduled')
           .order('created_at', { ascending: false })
           .range(from, to),

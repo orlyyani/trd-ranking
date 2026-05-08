@@ -13,17 +13,17 @@ const props = defineProps<{
   loserName: string
   winnerAvatar?: string | null
   loserAvatar?: string | null
-  // Doubles partner names (optional — omit for singles)
   winnerPartnerName?: string | null
   loserPartnerName?: string | null
   isLive?: boolean
-  /** Hides the date/meta column — use in narrow containers like sidebars */
   compact?: boolean
-  /** If provided, highlights which side this player is on */
   perspectivePlayerId?: string
+  /** false = friendly/unranked — no MMR impact */
+  ranked?: boolean
 }>()
 
-const isDoubles = computed(() => !!props.winnerPartnerName || !!props.loserPartnerName)
+const isDoubles  = computed(() => !!props.winnerPartnerName || !!props.loserPartnerName)
+const isFriendly = computed(() => props.ranked === false)
 
 const isWinner = computed(() => props.perspectivePlayerId === props.winnerId)
 const isLoser  = computed(() => props.perspectivePlayerId === props.loserId)
@@ -58,6 +58,7 @@ const formattedDate = computed(() =>
       <span class="text-sm font-mono font-semibold text-white">{{ score }}</span>
       <SurfaceBadge :surface="surface" class="mt-0.5" />
       <span v-if="isDoubles" class="text-xs text-slate-600 mt-0.5">2v2</span>
+      <span v-if="isFriendly" class="text-xs text-slate-500 mt-0.5 ring-1 ring-slate-600 rounded px-1">Friendly</span>
     </div>
 
     <!-- Loser side -->

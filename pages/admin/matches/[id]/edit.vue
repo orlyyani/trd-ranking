@@ -14,7 +14,7 @@ const [{ data: players }, { data: match }] = await Promise.all([
   useAsyncData(`admin-edit-match-${id}`, async () => {
     const { data } = await supabase
       .from('matches')
-      .select('id, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, date, score, surface, tournament, round, stream_url, is_live, live_score, status, challonge_match_id, challonge_tournament')
+      .select('id, match_type, player1_id, player2_id, player3_id, player4_id, winner_id, loser_id, date, score, surface, tournament, round, ranked, stream_url, is_live, live_score, status, challonge_match_id, challonge_tournament')
       .eq('id', id)
       .single()
     return data
@@ -38,6 +38,7 @@ const info = reactive({
   surface:              match.value.surface as typeof SURFACES[number],
   tournament:           match.value.tournament ?? '',
   round:                match.value.round ?? '' as typeof ROUNDS[number] | '',
+  ranked:               match.value.ranked ?? true,
   stream_url:           match.value.stream_url ?? '',
   challonge_match_id:   match.value.challonge_match_id ?? '',
   challonge_tournament: match.value.challonge_tournament ?? '',
@@ -63,6 +64,7 @@ async function saveInfo() {
       surface:              info.surface,
       tournament:           info.tournament.trim()           || undefined,
       round:                info.round                      || undefined,
+      ranked:               info.ranked,
       stream_url:           info.stream_url.trim()          || undefined,
       challonge_match_id:   info.challonge_match_id.trim()  || undefined,
       challonge_tournament: info.challonge_tournament.trim() || undefined,
@@ -299,6 +301,18 @@ const completedWinnerName = computed(() => {
               :class="['rounded-full px-3 py-1 text-sm font-medium capitalize transition-colors border', info.round === r ? 'bg-brand-600 border-brand-500 text-white' : 'bg-surface border-surface-border text-slate-400 hover:text-white']"
               @click="info.round = info.round === r ? '' : r">{{ r }}</button>
           </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Match mode</label>
+          <div class="flex rounded-lg overflow-hidden border border-surface-border w-fit">
+            <button type="button"
+              :class="['px-5 py-2 text-sm font-medium transition-colors', info.ranked ? 'bg-brand-600 text-white' : 'bg-surface text-slate-400 hover:text-white']"
+              @click="info.ranked = true">Ranked</button>
+            <button type="button"
+              :class="['px-5 py-2 text-sm font-medium transition-colors', !info.ranked ? 'bg-slate-700 text-white' : 'bg-surface text-slate-400 hover:text-white']"
+              @click="info.ranked = false">Friendly</button>
+          </div>
+          <p v-if="!info.ranked" class="mt-1 text-xs text-slate-500">No MMR changes — recorded for history only.</p>
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">Stream URL <span class="text-slate-500 font-normal">(optional)</span></label>
