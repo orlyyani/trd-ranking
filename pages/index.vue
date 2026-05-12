@@ -5,8 +5,10 @@ import type { CommunityTournament } from '~/server/api/challonge-community.get'
 const PAGE_SIZE = 10
 const page = ref(1)
 const searchQuery = ref('')
+const mode = ref<'singles' | 'doubles'>('singles')
 watch(searchQuery, () => { page.value = 1 })
-const { data: leaderboard, pending, error } = await useLeaderboard({ page, limit: PAGE_SIZE, search: searchQuery })
+watch(mode, () => { page.value = 1 })
+const { data: leaderboard, pending, error } = await useLeaderboard({ page, limit: PAGE_SIZE, search: searchQuery, mode })
 const totalPages = computed(() => Math.ceil((leaderboard.value?.total ?? 0) / PAGE_SIZE))
 
 const { liveMatch } = useLiveMatch()
@@ -183,7 +185,19 @@ useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderb
       <!-- Left: Leaderboard -->
       <div class="space-y-4">
         <div class="flex items-center justify-between gap-4 flex-wrap">
-          <h1 class="text-xl sm:text-2xl font-semibold text-white">Leaderboard</h1>
+          <div class="flex items-center gap-3">
+            <h1 class="text-xl sm:text-2xl font-semibold text-white">Leaderboard</h1>
+            <div class="flex rounded-lg overflow-hidden border border-surface-border text-xs font-medium">
+              <button
+                :class="['px-3 py-1.5 transition-colors', mode === 'singles' ? 'bg-brand-600 text-white' : 'bg-surface text-slate-400 hover:text-white']"
+                @click="mode = 'singles'"
+              >Singles</button>
+              <button
+                :class="['px-3 py-1.5 transition-colors', mode === 'doubles' ? 'bg-brand-600 text-white' : 'bg-surface text-slate-400 hover:text-white']"
+                @click="mode = 'doubles'"
+              >Doubles</button>
+            </div>
+          </div>
           <div class="relative">
             <svg class="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500 pointer-events-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -205,7 +219,7 @@ useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderb
             <thead>
               <tr class="border-b border-surface-border text-xs text-slate-500 uppercase tracking-widest">
                 <th class="px-4 py-3 text-right w-10">#</th>
-                <th class="px-4 py-3 text-left w-8"></th>
+                <th v-if="mode === 'singles'" class="px-4 py-3 text-left w-8"></th>
                 <th class="px-4 py-3 text-left">Player</th>
                 <th class="px-4 py-3 text-center">Class</th>
                 <th class="px-4 py-3 text-center">W</th>
@@ -221,7 +235,7 @@ useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderb
                   class="hover:bg-surface-elevated/50 transition-colors"
                 >
                   <td class="px-4 py-3 text-right text-slate-400 font-mono tabular-nums">{{ player.rank }}</td>
-                  <td class="px-2 py-3"><RankDelta :delta="player.rankDelta" /></td>
+                  <td v-if="mode === 'singles'" class="px-2 py-3"><RankDelta :delta="player.rankDelta" /></td>
                   <td class="px-4 py-3">
                     <NuxtLink :to="`/players/${player.id}`" class="flex items-center gap-3 group">
                       <PlayerAvatar :name="player.name" :avatar-url="player.avatar_url" :size="36" />
@@ -238,7 +252,7 @@ useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderb
               </template>
               <tr v-else>
                 <td colspan="7" class="px-4 py-8 text-center text-slate-500 text-sm">
-                  No players match "{{ searchQuery }}"
+                  {{ searchQuery ? `No players match "${searchQuery}"` : 'No doubles matches recorded yet.' }}
                 </td>
               </tr>
             </tbody>
