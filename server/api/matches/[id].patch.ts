@@ -94,6 +94,10 @@ export default defineEventHandler(async (event) => {
   if (status               !== undefined) {
     patch.status  = resolvedStatus
     patch.is_live = resolvedStatus === 'live'
+    // When setting this match live, clear stale is_live flags on all others.
+    if (patch.is_live === true) {
+      await admin.from('matches').update({ is_live: false }).neq('id', id).eq('is_live', true)
+    }
   }
 
   if (Object.keys(patch).length === 0) return { matchId: id }

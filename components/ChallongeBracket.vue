@@ -73,7 +73,10 @@ function roundLabel(round: number) {
             v-for="m in matches"
             :key="m.matchId"
             class="card py-2.5 px-3 flex items-center gap-3 text-sm transition-colors"
-            :class="m.isLive ? 'border-red-500/30 bg-red-500/5' : ''"
+            :class="{
+              'border-red-500/30 bg-red-500/5': m.isLive,
+              'border-emerald-500/30 bg-emerald-500/5': m.state === 'complete',
+            }"
           >
             <!-- Player 1 -->
             <div class="flex items-center gap-1.5 flex-1 min-w-0">
@@ -86,7 +89,12 @@ function roundLabel(round: number) {
               </span>
               <span
                 class="truncate"
-                :class="m.state === 'pending' ? 'text-slate-600' : 'text-slate-200'"
+                :class="
+                  m.state === 'pending' ? 'text-slate-600'
+                  : m.state === 'complete' && m.winnerSlot === 1 ? 'text-emerald-300 font-medium'
+                  : m.state === 'complete' && m.winnerSlot === 2 ? 'text-slate-500 line-through decoration-slate-600'
+                  : 'text-slate-200'
+                "
               >
                 {{ m.player1Name }}
               </span>
@@ -95,7 +103,7 @@ function roundLabel(round: number) {
             <!-- Score / state -->
             <div class="font-mono text-xs shrink-0 w-20 text-center">
               <template v-if="m.state === 'complete'">
-                <span class="text-slate-400">{{ m.score || '—' }}</span>
+                <span class="text-emerald-400">{{ m.score || '—' }}</span>
               </template>
               <template v-else-if="m.isLive">
                 <span class="text-red-400">{{ m.score || 'Live' }}</span>
@@ -109,7 +117,12 @@ function roundLabel(round: number) {
             <div class="flex items-center justify-end flex-1 min-w-0">
               <span
                 class="truncate text-right"
-                :class="m.state === 'pending' ? 'text-slate-600' : 'text-slate-400'"
+                :class="
+                  m.state === 'pending' ? 'text-slate-600'
+                  : m.state === 'complete' && m.winnerSlot === 2 ? 'text-emerald-300 font-medium'
+                  : m.state === 'complete' && m.winnerSlot === 1 ? 'text-slate-500 line-through decoration-slate-600'
+                  : 'text-slate-400'
+                "
               >
                 {{ m.player2Name }}
               </span>
@@ -117,7 +130,7 @@ function roundLabel(round: number) {
 
             <!-- Status pill -->
             <div class="shrink-0 w-12 text-right">
-              <span v-if="m.state === 'complete'" class="text-xs text-slate-600">Done</span>
+              <span v-if="m.state === 'complete'" class="text-xs font-semibold text-emerald-600">&#10003;</span>
               <span v-else-if="m.state === 'pending'" class="text-xs text-slate-700">TBD</span>
             </div>
           </div>

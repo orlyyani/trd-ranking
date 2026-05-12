@@ -39,7 +39,8 @@ function formatUpcomingDate(iso: string | null) {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-// One entry per live match — DB match first, then one per Challonge tournament
+// One entry per live match — DB match takes full priority over Challonge.
+// If a DB live match exists, Challonge entries are suppressed entirely.
 const liveBanners = computed(() => {
   const items: Array<{
     player1: string
@@ -66,6 +67,7 @@ const liveBanners = computed(() => {
       tournamentName: null,
       source:         'db',
     })
+    return items
   }
 
   for (const t of challongeLiveTournaments.value) {
@@ -346,8 +348,8 @@ useHead({ title: 'Leaderboard', meta: [{ property: 'og:title', content: 'Leaderb
             </a>
           </div>
 
-          <!-- Challonge live matches (one card per tournament) -->
-          <template v-if="challongeLiveTournaments.length">
+          <!-- Challonge live matches — suppressed when a DB live match exists -->
+          <template v-if="!liveMatch && challongeLiveTournaments.length">
             <div
               v-for="t in challongeLiveTournaments"
               :key="t.slug"

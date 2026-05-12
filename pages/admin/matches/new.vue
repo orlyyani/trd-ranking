@@ -122,6 +122,13 @@ async function submit() {
     const res = await $fetch('/api/matches', { method: 'POST', body }) as { matchId: string; status: string }
     success.value = res
 
+    // For live matches, redirect to the edit page immediately so the match is
+    // managed in one place rather than risking a duplicate 'completed' record.
+    if (form.status === 'live') {
+      await navigateTo(`/admin/matches/${res.matchId}/edit`)
+      return
+    }
+
     form.player1_id = ''; form.player2_id = ''; form.player3_id = ''; form.player4_id = ''
     form.winner_id = ''; form.winning_team = ''; form.score = ''
     form.tournament = ''; form.round = ''; form.stream_url = ''

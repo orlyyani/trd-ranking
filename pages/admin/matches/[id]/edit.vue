@@ -165,11 +165,9 @@ async function completeMatch() {
     })
     currentStatus.value = 'completed'
     isLive.value = false
-    if (match.value) {
-      match.value.winner_id = effectiveWinnerId
-      match.value.score = finalScore.value.trim()
-    }
-    scoreSuccess.value = 'Match completed! MMR recalculated.'
+    // Redirect to the match detail page so the result is visible and the
+    // 'Complete match' section can no longer be accidentally re-submitted.
+    await navigateTo(`/matches/${id}`)
   } catch (err: unknown) {
     scoreError.value = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? 'Error'
   } finally {

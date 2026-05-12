@@ -52,6 +52,12 @@ export default defineEventHandler(async (event) => {
     if (is_live === undefined) patch.is_live = status === 'live'
   }
 
+  // Before setting this match live, clear is_live on all other matches so
+  // stale live flags don't accumulate and break useLiveMatch's maybeSingle logic.
+  if (patch.is_live === true) {
+    await admin.from('matches').update({ is_live: false }).neq('id', id).eq('is_live', true)
+  }
+
   const { error } = await admin.from('matches').update(patch).eq('id', id)
   if (error) throw createError({ statusCode: 500, statusMessage: error.message })
 
