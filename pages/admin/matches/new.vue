@@ -147,6 +147,14 @@ const formattedDate = computed(() =>
     ? new Date(form.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—',
 )
+
+const winnerOptions = computed(() => {
+  const all = (players.value ?? []) as Array<{ id: string; name: string; mmr: number }>
+  return [form.player1_id, form.player2_id].flatMap(id => {
+    const p = all.find(pl => pl.id === id)
+    return p ? [p] : []
+  })
+})
 </script>
 
 <template>
@@ -203,17 +211,11 @@ const formattedDate = computed(() =>
           <template v-if="!isDoubles">
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-1">Player 1</label>
-              <select v-model="form.player1_id" required class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option value="" disabled>Select player…</option>
-                <option v-for="p in players" :key="p.id" :value="p.id" :disabled="p.id === form.player2_id">{{ p.name }} ({{ p.mmr }})</option>
-              </select>
+              <PlayerCombobox v-model="form.player1_id" :players="players ?? []" :disabled-ids="new Set([form.player2_id].filter(Boolean))" placeholder="Search player…" required />
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-1">Player 2</label>
-              <select v-model="form.player2_id" required class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option value="" disabled>Select player…</option>
-                <option v-for="p in players" :key="p.id" :value="p.id" :disabled="p.id === form.player1_id">{{ p.name }} ({{ p.mmr }})</option>
-              </select>
+              <PlayerCombobox v-model="form.player2_id" :players="players ?? []" :disabled-ids="new Set([form.player1_id].filter(Boolean))" placeholder="Search player…" required />
             </div>
           </template>
 
@@ -223,17 +225,11 @@ const formattedDate = computed(() =>
               <p class="text-xs font-semibold uppercase tracking-wider text-brand-400">Team A</p>
               <div>
                 <label class="block text-xs text-slate-400 mb-1">Player 1</label>
-                <select v-model="form.player1_id" required class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-                  <option value="" disabled>Select player…</option>
-                  <option v-for="p in players" :key="p.id" :value="p.id" :disabled="usedIds.has(p.id) && p.id !== form.player1_id">{{ p.name }} ({{ p.mmr }})</option>
-                </select>
+                <PlayerCombobox v-model="form.player1_id" :players="players ?? []" :disabled-ids="usedIds" placeholder="Search player…" required />
               </div>
               <div>
                 <label class="block text-xs text-slate-400 mb-1">Partner</label>
-                <select v-model="form.player3_id" required class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-                  <option value="" disabled>Select partner…</option>
-                  <option v-for="p in players" :key="p.id" :value="p.id" :disabled="usedIds.has(p.id) && p.id !== form.player3_id">{{ p.name }} ({{ p.mmr }})</option>
-                </select>
+                <PlayerCombobox v-model="form.player3_id" :players="players ?? []" :disabled-ids="usedIds" placeholder="Search partner…" required />
               </div>
             </div>
 
@@ -243,17 +239,11 @@ const formattedDate = computed(() =>
               <p class="text-xs font-semibold uppercase tracking-wider text-red-400">Team B</p>
               <div>
                 <label class="block text-xs text-slate-400 mb-1">Player 2</label>
-                <select v-model="form.player2_id" required class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-                  <option value="" disabled>Select player…</option>
-                  <option v-for="p in players" :key="p.id" :value="p.id" :disabled="usedIds.has(p.id) && p.id !== form.player2_id">{{ p.name }} ({{ p.mmr }})</option>
-                </select>
+                <PlayerCombobox v-model="form.player2_id" :players="players ?? []" :disabled-ids="usedIds" placeholder="Search player…" required />
               </div>
               <div>
                 <label class="block text-xs text-slate-400 mb-1">Partner</label>
-                <select v-model="form.player4_id" required class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-                  <option value="" disabled>Select partner…</option>
-                  <option v-for="p in players" :key="p.id" :value="p.id" :disabled="usedIds.has(p.id) && p.id !== form.player4_id">{{ p.name }} ({{ p.mmr }})</option>
-                </select>
+                <PlayerCombobox v-model="form.player4_id" :players="players ?? []" :disabled-ids="usedIds" placeholder="Search partner…" required />
               </div>
             </div>
           </template>
@@ -315,11 +305,11 @@ const formattedDate = computed(() =>
             <!-- Singles winner -->
             <div v-if="!isDoubles">
               <label class="block text-sm font-medium text-slate-300 mb-1">Winner</label>
-              <select v-model="form.winner_id" class="w-full rounded-lg bg-surface border border-surface-border px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option value="" disabled>Select winner…</option>
-                <option v-if="form.player1_id" :value="form.player1_id">{{ playerName(form.player1_id) || 'Player 1' }}</option>
-                <option v-if="form.player2_id" :value="form.player2_id">{{ playerName(form.player2_id) || 'Player 2' }}</option>
-              </select>
+              <PlayerCombobox
+                v-model="form.winner_id"
+                :players="winnerOptions"
+                placeholder="Select winner…"
+              />
             </div>
 
             <!-- Doubles winning team -->

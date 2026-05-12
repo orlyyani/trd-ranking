@@ -357,43 +357,52 @@ useHead(() => ({
             Edit
           </NuxtLink>
         </div>
-        <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-400">
-          <RankBadge :tier="player!.tier" :size="44" />
-          <span class="inline-flex items-baseline gap-1">
-            <span class="text-lg font-mono font-semibold" :class="mmrColor">{{ player!.mmr }}</span>
-            <span class="text-xs text-slate-500">MMR</span>
+        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-slate-400">
+          <!-- MMR + rank — kept as one non-breaking unit -->
+          <span class="inline-flex items-center gap-2 whitespace-nowrap">
+            <RankBadge :tier="player!.tier" :size="44" />
+            <span class="inline-flex items-baseline gap-1">
+              <span class="text-lg font-mono font-semibold" :class="mmrColor">{{ player!.mmr }}</span>
+              <span class="text-xs text-slate-500">MMR</span>
+            </span>
+            <RankDelta :delta="data.rankDelta" />
+            <span class="text-slate-500">#{{ data.rank }}</span>
           </span>
-          <RankDelta :delta="data.rankDelta" />
-          <span class="text-slate-500">#{{ data.rank }}</span>
-          <span class="text-slate-600 text-xs uppercase tracking-wider">Singles</span>
-          <span><span class="text-brand-400 font-semibold">{{ player!.wins }}</span> W</span>
-          <span><span class="text-red-400 font-semibold">{{ player!.losses }}</span> L</span>
-          <span>{{ winRate }}</span>
-          <template v-if="hasDoubles">
-            <span class="text-slate-700">·</span>
+
+          <!-- Singles stats — non-breaking unit -->
+          <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <span class="text-slate-600 text-xs uppercase tracking-wider">Singles</span>
+            <span><span class="text-brand-400 font-semibold">{{ player!.wins }}</span> W</span>
+            <span><span class="text-red-400 font-semibold">{{ player!.losses }}</span> L</span>
+            <span>{{ winRate }}</span>
+          </span>
+
+          <!-- Doubles stats — non-breaking unit -->
+          <span v-if="hasDoubles" class="inline-flex items-center gap-1.5 whitespace-nowrap">
             <span class="text-slate-600 text-xs uppercase tracking-wider">Doubles</span>
             <span><span class="text-brand-400 font-semibold">{{ player!.doubles_wins }}</span> W</span>
             <span><span class="text-red-400 font-semibold">{{ player!.doubles_losses }}</span> L</span>
             <span>{{ doublesWinRate }}</span>
-          </template>
-          <template v-if="hasFriendly">
-            <span class="text-slate-700">·</span>
+          </span>
+
+          <!-- Friendly stats — non-breaking unit -->
+          <span v-if="hasFriendly" class="inline-flex items-center gap-1.5 whitespace-nowrap">
             <span class="text-slate-600 text-xs uppercase tracking-wider">Friendly</span>
             <span><span class="text-brand-400 font-semibold">{{ friendlyStats.wins }}</span> W</span>
             <span><span class="text-red-400 font-semibold">{{ friendlyStats.losses }}</span> L</span>
             <span>{{ friendlyWinRate }}</span>
-          </template>
+          </span>
         </div>
       </div>
 
       <!-- MMR sparkline -->
-      <div v-if="sparklinePath" class="shrink-0 hidden sm:block">
+      <div v-if="sparklinePath" class="shrink-0 w-full sm:w-auto">
         <p class="text-xs text-slate-500 mb-1">MMR history</p>
         <svg
           viewBox="0 0 300 60"
-          width="150"
+          width="100%"
           height="30"
-          class="overflow-visible"
+          class="overflow-visible sm:w-[150px]"
           aria-hidden="true"
         >
           <path
