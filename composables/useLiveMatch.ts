@@ -21,12 +21,14 @@ export const useLiveMatch = () => {
   const { data: liveMatch, refresh } = useAsyncData<LiveMatch | null>(
     'live-match',
     async () => {
-      const { data: match } = await supabase
+      const { data: matches } = await supabase
         .from('matches')
         .select('id, match_type, stream_url, live_score, status, player1_id, player2_id, player3_id, player4_id')
         .eq('is_live', true)
-        .maybeSingle()
+        .order('created_at', { ascending: false })
+        .limit(1)
 
+      const match = matches?.[0] ?? null
       if (!match) return null
 
       const playerIds = [
