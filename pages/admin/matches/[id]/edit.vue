@@ -53,6 +53,9 @@ const infoError         = ref('')
 const infoSuccess       = ref(false)
 const showRankedWarning   = ref(false)
 const showCompleteConfirm = ref(false)
+const showDeleteConfirm   = ref(false)
+const deleteLoading       = ref(false)
+const deleteError         = ref('')
 
 function trySetRanked() {
   if (!info.ranked) showRankedWarning.value = true
@@ -175,6 +178,17 @@ async function completeMatch() {
   }
 }
 
+async function deleteMatch() {
+  deleteLoading.value = true; deleteError.value = ''
+  try {
+    await $fetch(`/api/matches/${id}`, { method: 'DELETE' })
+    navigateTo('/admin')
+  } catch (err: unknown) {
+    deleteError.value = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? 'Delete failed'
+    deleteLoading.value = false
+  }
+}
+
 async function setStatus(s: 'scheduled' | 'live' | 'completed') {
   scoreError.value = ''
   await $fetch(`/api/matches/${id}/live`, { method: 'PATCH', body: { status: s } })
@@ -227,13 +241,23 @@ const completedWinnerName = computed(() => {
       <span v-if="isDoubles" class="rounded-full px-2.5 py-0.5 text-xs font-semibold bg-slate-800 text-slate-400">
         Doubles
       </span>
-      <button
-        type="button"
-        class="ml-auto rounded-lg border border-surface-border px-3 py-1 text-xs text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
-        @click="showDetails = !showDetails"
-      >
-        {{ showDetails ? 'Hide details' : 'Show details' }}
-      </button>
+      <div class="ml-auto flex items-center gap-2">
+        <button
+          v-if="currentStatus !== 'completed'"
+          type="button"
+          class="rounded-lg border border-red-800/60 px-3 py-1 text-xs text-red-400 hover:text-white hover:bg-red-900/40 hover:border-red-700 transition-colors"
+          @click="showDeleteConfirm = true"
+        >
+          Delete
+        </button>
+        <button
+          type="button"
+          class="rounded-lg border border-surface-border px-3 py-1 text-xs text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+          @click="showDetails = !showDetails"
+        >
+          {{ showDetails ? 'Hide details' : 'Show details' }}
+        </button>
+      </div>
     </div>
 
     <div :class="['grid grid-cols-1 gap-6 items-start', gridCols]">
@@ -538,6 +562,34 @@ const completedWinnerName = computed(() => {
               class="flex-1 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 px-4 py-2 text-sm font-medium text-white transition-colors"
               @click="showCompleteConfirm = false; completeMatch()"
             >{{ info.ranked ? 'Confirm & update MMR' : 'Confirm & complete' }}</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
+  <!-- ── Delete confirmation modal ───────────────────────────────────────────── -->
+  <Teleport to="body">
+    <Transition enter-active-class="transition-opacity duration-150" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition-opacity duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
+      <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="showDeleteConfirm = false">
+        <div class="bg-surface-elevated border border-surface-border rounded-xl shadow-2xl w-full max-w-sm space-y-4 p-6">
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 flex-shrink-0 rounded-full bg-red-500/15 p-2">
+              <svg class="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold text-white">Delete this match?</h3>
+              <p class="mt-1 text-sm text-slate-400">This match will be permanently removed. Rankings are not affected.</p>
+            </div>
+          </div>
+          <p v-if="deleteError" class="text-sm text-red-400">{{ deleteError }}</p>
+          <div class="flex gap-3">
+            <button type="button" class="flex-1 rounded-lg border border-surface-border px-4 py-2 text-sm font-medium text-slate-400 hover:text-white hover:border-slate-500 transition-colors" @click="showDeleteConfirm = false">Cancel</button>
+            <button type="button" :disabled="deleteLoading" class="flex-1 rounded-lg bg-red-700 hover:bg-red-600 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white transition-colors" @click="deleteMatch">
+              {{ deleteLoading ? 'Deleting…' : 'Delete match' }}
+            </button>
           </div>
         </div>
       </div>
